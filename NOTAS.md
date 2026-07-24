@@ -103,6 +103,7 @@ else:
                 break
             print ("La región solo puede contener letras.")
 
+        #territories=accent_normalization.get(territories,territories.capitalize()) #El problema es que no hay separación de datos"
         territories_key=accent_normalization(territories_raw)
         territories_processed=accent_normalization_dic.get(territories_key,territories_raw.title())
 
