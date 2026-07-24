@@ -14,10 +14,16 @@ df_territories_city
 ```python
 current_directory= Path.cwd()
 project_root=current_directory.parent
-actual_directory=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
-df_territories_city=pd.read_csv(actual_directory)
+actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
+
+if not actual_file.exists():
+    raise FileNotFoundError("Falta el insumo de trabajo. Debe nombrarlo como \"datos_sucios_hito1.csv\" y guardarlo en data/raw/")
+
+df_territories_city=pd.read_csv(actual_file)
 df_territories_city
 ```
+2. El raise detiene la ejecución del código con un mensaje explicativo en caso de que no exista el archivo con el insumo. 
+
 Las bondades de Pathlib sobre lo demás, se explicarán más adelante en la creación del archivo con los datos limpios.
 
 # Segundo módulo: extracción de valores únicos por columna "Municipios"
@@ -94,18 +100,33 @@ def is_input_valid(text):
 
 # Quinto módulo: archivo de progreso
 ```python
-if os.path.exists("progress_territories.json"):
-    with open ("progress_territories.json", "r") as f:
-        data_saved=json.load(f)
-else:
-    data_saved=None
+# if os.path.exists("progress_territories.json"):
+#     with open ("progress_territories.json", "r") as f:
+#         data_saved=json.load(f)
+# else:
+#     data_saved=None
 ```
-
+**Explicación obsoleta de las líneas precedentes:**
 1. Estas líneas son el seguro de progreso. Lo que hago aquí, con la librería os, ya integrada a Python, es tratar de crear un archivo json (el mejor para guardar listas y diccionarios), para lo cual uso la librería correspondiente, que se llame "progress_territories.json".
 2. Verifico si ya existe un archivo llamado de esa manera con el método path.exists().
 3. Si existe, entonces lo abro con "with open" y uso "r" como parámetro de mode. Quiere decir que lo voy a tratar como archivo de solo lectura. "as f", donde f es simplemente el "nombre" que le doy al archivo.
 4. Una vez abierto, porque existe, cargo los datos a la variable "data_saved".
 5. Sino existe, esa misma variable queda vacía.
+
+**Actualización de código:**
+```python
+progress_root=project_root/"data"/"interim"
+progress_root.mkdir(parents=True,exist_ok=True)
+progress_file=progress_root/"progress_territories.json"
+
+if progress_file.exists():
+    with open(progress_file, "r") as f: #Se descartó pd.read_json(..., typ='series') para cargar el mapeo de regiones, porque el archivo es técnicamente un diccionario, no un DataFrame — pandas interpretaría las llaves como columnas y los valores como filas, sin índices reales. Es más correcto y directo usar la librería json estándar.
+        raw_data_saved=json.load(f)
+else:
+    raw_data_saved={}
+data_saved={k.strip():v for k,v in raw_data_saved.items()}
+```
+Más adelante se justifica la decisión de manejar el json con pathlib.
 
 # Sexto módulo: función principal para crear el diccionario
 ```python
@@ -142,7 +163,7 @@ def city_territories(city_list,progress=None): #Estoy tratando de crear un dicci
     return city_territories_dic
 
 rpoint=city_territories(city_list, progress=data_saved) #Creo el archivo para guardar la información
-with open ("progress_territories.json","w") as f:
+with open (progress_file,"w") as f:
     json.dump(rpoint,f)
 
 #print(rpoint) esto tiene un problema, porque no me muestra realmente lo que se guardò en el json
@@ -166,7 +187,10 @@ print(json.dumps(rpoint, indent=4, ensure_ascii=False))
 15. Para comprobar la validez del archivo, lo llamo.
 
 # Séptimo módulo: creación del archivo definitivo en una nueva ruta
-1. La carpeta /data contiene 3 subcarpetas: /interim, /raw, las cuales son preexistentes al código, pues este no las crea en la medida en que sus archivos son persistentes en gran medida, es decir, hacen parte funcional del código, sobre todo lo que hay en /raw, pues el .json de /interim se genera mediante el código, pero es un archivo funcional del mismo, no el output esperado. La tercera es /processed, que puede preexistir o no, pues esta contiene el output final del código: los datos limpios y procesados en un nuevo archivo.
+1. La carpeta /data contiene 3 subcarpetas: 
+    - /raw, la cual debería ser preexistente al código. En este caso, la ruta se construye como objeto con Pathlib, pero el uso de sus flags parents y exist_ok es innecesario. No está dentro del alcance del proyecto organizar un trabajo que es previo al mismo: nombrar el insumo y ubicarlo en su ruta correspondiente, sino trabajo del usuario.
+    - /interim, en cambio, se maneja enteramente con Pathlib y sus flags, pues es resultado de la ejecución del código.
+    - /processed contiene el output final del código: los datos limpios y procesados en un nuevo archivo.
 
 ```python
 saved_output_directory=project_root/"data"/"processed"
