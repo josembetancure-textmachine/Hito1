@@ -1,46 +1,67 @@
 # Primer módulo: generación de los dataframes necesarios.
 
-'''df_territories_city=pd.read_csv("~/Escritorio/Hito1/data/raw/datos_sucios_hito1.csv")
-df_territories_city'''
+```python
+df_territories_city=pd.read_csv("~/Escritorio/Hito1/data/raw/datos_sucios_hito1.csv")
+df_territories_city
+```
 
 1. La línea de pandas que uso para abrir el archivo que contiene los datos. El "~" significa, en sistemas basados en unix, como Linux, la carpeta principal del usuario. pd es el acortamiento universal para pandas cuando lo importo como "import pandas as pd". 
     - Debo considerar el uso de pathlib, pues la ruta indicada es relativa a mi máquina.
 
+**Sin embargo:**
+1. Usar ~ no es la práctica correcta, pues se genera una ruta relativa a mi máquina que, muy probablemente, no funcionará en otras. Para esto, puedo usar Pathlib, que me sirve para manejar rutas más robustas y, al mismo tiempo, más flexibles. El código definitivo es el siguiente:
+
+```python
+current_directory= Path.cwd()
+project_root=current_directory.parent
+actual_directory=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
+df_territories_city=pd.read_csv(actual_directory)
+df_territories_city
+```
+Las bondades de Pathlib sobre lo demás, se explicarán más adelante en la creación del archivo con los datos limpios.
+
 # Segundo módulo: extracción de valores únicos por columna "Municipios"
-'''city_list=df_territories_city["Municipio"].unique().tolist() #Opción mpas eficiente para el manejo de recursos.
-city_list'''
+```python
+city_list=df_territories_city["Municipio"].unique().tolist() #Opción mpas eficiente para el manejo de recursos.
+city_list
+```
 
 1. Aquí genero una lista a partir del dataframe original. Con los métodos unique() solo obtengo los valores únicos de la columna "Municipio". Esto es útil para que el programa no me pida un municipio todas las veces que aparezca. Con tolist(), convierto todo en lista de una vez.
 
 **Otras opciones usadas y descartadas:**
-    city_columns=["Municipio"]
-    df_city=pd.read_csv("./datos_sucios_hito1.csv",usecols=city_columns)
-    df_city
+```python
+    # city_columns=["Municipio"]
+    # df_city=pd.read_csv("./datos_sucios_hito1.csv",usecols=city_columns)
+    # df_city
 
-    2. Opción ganadora por eficiencia de recursos
-    df_city=df_territories_city[["Municipio"]]
-    df_city
-
-    Esta última opción la descarté, sin embargo, porque agrega un paso innecesario a esto, pues desde el principio puedo crear la lista directamente.
+    #Opción ganadora por eficiencia de recursos
+    # df_city=df_territories_city[["Municipio"]]
+    # df_city
+ ```
+Esta última opción la descarté, sin embargo, porque agrega un paso innecesario a esto, pues desde el principio puedo crear la lista directamente.
 
 # Tercer módulo: normalización de acentos
 
-'''df_territories_accent=df_territories_city[df_territories_city["Región"].str.contains("á|é|í|ó|ú",case=False)]
+```python
+df_territories_accent=df_territories_city[df_territories_city["Región"].str.contains("á|é|í|ó|ú",case=False)]
 list_accent=df_territories_accent["Región"].unique().tolist()
-list_accent'''
+list_accent
+```
 
 1. Los usuarios son expertos en no usar tildes, pero el manejo de datos precisos las requiere. Una tilde puede distinguir dos conceptos distintos entre sí. Por eso genero un dataframe, a partir del original, que contenga únicamente las regiones (que finalmente serán el input del usuario) que tienen tilde. Es importante notar la sintaxis: esto es una máscara booleana. A simple vista, parece redundante, pero tiene un sentido lo que está dentro de corchetes es el filtro que se aplica a lo que esta fuera. Es muy explícito. Uno podría aplicar un filtro con los datos de una Tabla A a una Tabla B. Es raro, pero posible.
 
 # Cuarto módulo: funciones para validar el input.
 ## Normalización de acentos
-'''def accent_normalization(text):
+```python
+def accent_normalization(text):
     return (text.lower().strip()
             .replace("á","a")
             .replace("é","e")
             .replace("í","i")
             .replace("ó","o")
             .replace("ú","u"))
-accent_normalization_dic={accent_normalization(a): a for a in list_accent}'''
+accent_normalization_dic={accent_normalization(a): a for a in list_accent}
+```
 
 1. Esta es la función para reemplazar los acentos. El parámetro (recordar que el parámetro es lo que se pasa a la función a través del argumento. Es decir, un parámetro es como un placeholder que luego recibirá un valor como argumento cuando se llame a la función), denominado "text", recibirá el argumento más adelante, el cual corresponde al input del usuario.
     - La función "accent_normalization", como su nombre lo indica, sirve para normalizar los acentos mediante la creación de un diccionario, así:
@@ -52,15 +73,19 @@ accent_normalization_dic={accent_normalization(a): a for a in list_accent}'''
     - El propósito de esto, como lo veremos más adelante, es asegurar que si el usuario ingresa un dato que debería llevar tilde, pero no se la pone, el programa lo corrija por él.
 
 **Opciones usadas y descartadas:**
-    '''#accent_normalization_dic={a.lower().strip().replace("á","a").replace("é","e").replace("í","i").replace("ó","o").replace("ú","u"): a for a in list_accent}'''
+```python
+#accent_normalization_dic={a.lower().strip().replace("á","a").replace("é","e").replace("í","i").replace("ó","o").replace("ú","u"): a for a in list_accent}
+```
 
     El motivo para haber descartado esta línea es porque es repetitiva. Ya la función existe para normalizar los acentos sin tener que repetir todo otra vez en la comprensión de diccionarios.
 
 ## Validación de que el input es texto
-'''def is_input_valid(text):
+```python
+def is_input_valid(text):
     if not text:
         return False
-    return text.replace(" ","").isalpha()'''
+    return text.replace(" ","").isalpha()
+```
 
 1. Esta es la segunda función del código. Como su nombre lo indica, su función es corroborar si el texto es una entrada válida, es decir, que sea texto y no contenga carácteres númericos. Debo precisar que la línea ".replace(" ","")" es absolutamente necesaria. .isalpha() rechaza todo lo que no esté catalogado como letra en la base de datos unicode, lo que incluye espacios, emojis, números, signos de puntación, carácteres especiales, etc., pero acepta todo lo que sea una letra en unicode (alfabetos no latinos, tildes, etc.). Por lo mismo, ese replace es necesario, porque necesito eliminar cualquier espacio entre palabras. Por ejemplo, si el usuario ingresa "Puerto Berrio", .isalpha() rechazará la entrada porque tiene un espacio. 
 2. La función recibe un parámetros que se denomina igual al de la función anterior. Es útil porque en realidad es el mismo argumento (el input del usuario) y así me evito manejar mil nombres.
@@ -68,11 +93,13 @@ accent_normalization_dic={accent_normalization(a): a for a in list_accent}'''
     - Más adelante veremos cómo se integra esta función con el código principal.
 
 # Quinto módulo: archivo de progreso
-'''if os.path.exists("progress_territories.json"):
+```python
+if os.path.exists("progress_territories.json"):
     with open ("progress_territories.json", "r") as f:
         data_saved=json.load(f)
 else:
-    data_saved=None'''
+    data_saved=None
+```
 
 1. Estas líneas son el seguro de progreso. Lo que hago aquí, con la librería os, ya integrada a Python, es tratar de crear un archivo json (el mejor para guardar listas y diccionarios), para lo cual uso la librería correspondiente, que se llame "progress_territories.json".
 2. Verifico si ya existe un archivo llamado de esa manera con el método path.exists().
@@ -81,7 +108,8 @@ else:
 5. Sino existe, esa misma variable queda vacía.
 
 # Sexto módulo: función principal para crear el diccionario
-'''def city_territories(city_list,progress=None): #Estoy tratando de crear un diccionario con city como llave y región como valor.
+```python
+def city_territories(city_list,progress=None): #Estoy tratando de crear un diccionario con city como llave y región como valor.
 
     if progress is None:
         city_territories_dic={}
@@ -118,7 +146,8 @@ with open ("progress_territories.json","w") as f:
     json.dump(rpoint,f)
 
 #print(rpoint) esto tiene un problema, porque no me muestra realmente lo que se guardò en el json
-print(json.dumps(rpoint, indent=4, ensure_ascii=False))'''
+print(json.dumps(rpoint, indent=4, ensure_ascii=False))
+```
 
 1. Esta función es el corazón del código. Funciona con dos parámetros, "city_list" y "progress".
 2. Si progress (el cual se definirá más adelante) es vacío, entonces creamos un diccionario vacío con el nombre "city_territories_dic".
@@ -135,6 +164,21 @@ print(json.dumps(rpoint, indent=4, ensure_ascii=False))'''
 13. Ahora, llamo la función y aquí es donde se ejecuta el proceso ya descrito.
 14. Creo el archivo json si no existe, o lo sobreescribo si existe.
 15. Para comprobar la validez del archivo, lo llamo.
+
+# Séptimo módulo: creación del archivo definitivo en una nueva ruta
+1. La carpeta /data contiene 3 subcarpetas: /interim, /raw, las cuales son preexistentes al código, pues este no las crea en la medida en que sus archivos son persistentes en gran medida, es decir, hacen parte funcional del código, sobre todo lo que hay en /raw, pues el .json de /interim se genera mediante el código, pero es un archivo funcional del mismo, no el output esperado. La tercera es /processed, que puede preexistir o no, pues esta contiene el output final del código: los datos limpios y procesados en un nuevo archivo.
+
+```python
+saved_output_directory=project_root/"data"/"processed"
+saved_output_directory.mkdir(parents=True, exist_ok=True)
+saved_file=saved_output_directory/"datos_limpios_hito1.csv"
+
+df_territories_city.to_csv(saved_file,index=False,encoding="utf-8") #Se guarda la versión corregida: si se quisiera sobreescribr, basta con escribir el mismo nombre.
+```
+2. En un inicio, este código consistía solo en su última línea y usaba un str de ruta construido con ~. Ya expliqué por qué esto no era la mejor práctica.
+3. Lo que conseguí con Pathlib fue: crear una ruta como objeto más flexible y, al mismo tiempo, más robusta. Pathlib, además, tiene la capacidad de crear directorios inexistentes. Las flags parents=True y exist_ok=True funcionan para eso.
+    - parents puede crear carpetas en cascada si no existen desde la carpeta inicial. Por ejemplo, si "/data" no existiera, parent la crea y luego crearía "/processed".
+    - exist_ok, por su parte, no genera error si la carpeta existe, pues si existe ignora el comando de creación y, si no existe, la crea.
 
 # Oportunidades de mejora
 1. ¿Qué pasa si el usuario a una región le pone una tilde que no lleva?
