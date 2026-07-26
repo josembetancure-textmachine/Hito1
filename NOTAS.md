@@ -1,4 +1,6 @@
-# Primer módulo: generación de los dataframes necesarios.
+# 01_explore_regions.ipynb
+
+## Primer módulo: generación de los dataframes necesarios.
 
 ```python
 df_territories_city=pd.read_csv("~/Escritorio/Hito1/data/raw/datos_sucios_hito1.csv")
@@ -26,7 +28,7 @@ df_territories_city
 
 Las bondades de Pathlib sobre lo demás, se explicarán más adelante en la creación del archivo con los datos limpios.
 
-# Segundo módulo: extracción de valores únicos por columna "Municipios"
+## Segundo módulo: extracción de valores únicos por columna "Municipios"
 ```python
 city_list=df_territories_city["Municipio"].unique().tolist() #Opción mpas eficiente para el manejo de recursos.
 city_list
@@ -46,7 +48,7 @@ city_list
  ```
 Esta última opción la descarté, sin embargo, porque agrega un paso innecesario a esto, pues desde el principio puedo crear la lista directamente.
 
-# Tercer módulo: normalización de acentos
+## Tercer módulo: normalización de acentos
 
 ```python
 df_territories_accent=df_territories_city[df_territories_city["Región"].str.contains("á|é|í|ó|ú",case=False)]
@@ -56,8 +58,8 @@ list_accent
 
 1. Los usuarios son expertos en no usar tildes, pero el manejo de datos precisos las requiere. Una tilde puede distinguir dos conceptos distintos entre sí. Por eso genero un dataframe, a partir del original, que contenga únicamente las regiones (que finalmente serán el input del usuario) que tienen tilde. Es importante notar la sintaxis: esto es una máscara booleana. A simple vista, parece redundante, pero tiene un sentido lo que está dentro de corchetes es el filtro que se aplica a lo que esta fuera. Es muy explícito. Uno podría aplicar un filtro con los datos de una Tabla A a una Tabla B. Es raro, pero posible.
 
-# Cuarto módulo: funciones para validar el input.
-## Normalización de acentos
+## Cuarto módulo: funciones para validar el input.
+### Normalización de acentos
 ```python
 def accent_normalization(text):
     return (text.lower().strip()
@@ -85,7 +87,7 @@ accent_normalization_dic={accent_normalization(a): a for a in list_accent}
 
     El motivo para haber descartado esta línea es porque es repetitiva. Ya la función existe para normalizar los acentos sin tener que repetir todo otra vez en la comprensión de diccionarios.
 
-## Validación de que el input es texto
+### Validación de que el input es texto
 ```python
 def is_input_valid(text):
     if not text:
@@ -98,7 +100,7 @@ def is_input_valid(text):
 3. Si la entrada es vacía, entonces devolverá "False", de lo contrario, evaluará la entrada con .isalpha(). Si cumple, devuelve True y el código continúa, sino, devuelve False.
     - Más adelante veremos cómo se integra esta función con el código principal.
 
-# Quinto módulo: archivo de progreso
+## Quinto módulo: archivo de progreso
 ```python
 # if os.path.exists("progress_territories.json"):
 #     with open ("progress_territories.json", "r") as f:
@@ -128,7 +130,7 @@ data_saved={k.strip():v for k,v in raw_data_saved.items()}
 ```
 Más adelante se justifica la decisión de manejar el json con pathlib.
 
-# Sexto módulo: función principal para crear el diccionario
+## Sexto módulo: función principal para crear el diccionario
 ```python
 def city_territories(city_list,progress=None): #Estoy tratando de crear un diccionario con city como llave y región como valor.
 
@@ -186,7 +188,7 @@ print(json.dumps(rpoint, indent=4, ensure_ascii=False))
 14. Creo el archivo json si no existe, o lo sobreescribo si existe.
 15. Para comprobar la validez del archivo, lo llamo.
 
-# Séptimo módulo: creación del archivo definitivo en una nueva ruta
+## Séptimo módulo: creación del archivo definitivo en una nueva ruta
 1. La carpeta /data contiene 3 subcarpetas: 
     - /raw, la cual debería ser preexistente al código. En este caso, la ruta se construye como objeto con Pathlib, pero el uso de sus flags parents y exist_ok es innecesario. No está dentro del alcance del proyecto organizar un trabajo que es previo al mismo: nombrar el insumo y ubicarlo en su ruta correspondiente, sino trabajo del usuario.
     - /interim, en cambio, se maneja enteramente con Pathlib y sus flags, pues es resultado de la ejecución del código.
@@ -203,6 +205,195 @@ df_territories_city.to_csv(saved_file,index=False,encoding="utf-8") #Se guarda l
 3. Lo que conseguí con Pathlib fue: crear una ruta como objeto más flexible y, al mismo tiempo, más robusta. Pathlib, además, tiene la capacidad de crear directorios inexistentes. Las flags parents=True y exist_ok=True funcionan para eso.
     - parents puede crear carpetas en cascada si no existen desde la carpeta inicial. Por ejemplo, si "/data" no existiera, parent la crea y luego crearía "/processed".
     - exist_ok, por su parte, no genera error si la carpeta existe, pues si existe ignora el comando de creación y, si no existe, la crea.
+
+# 02_explore_contacts.ipynb
+
+## Primer módulo: generación del DataFrame necesario
+
+```python
+current_directory= Path.cwd()
+project_root=current_directory.parent
+actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
+
+if not actual_file.exists():
+    raise FileNotFoundError("Falta el insumo de trabajo. Debe nombrarlo como \"datos_sucios_hito1.csv\" y guardarlo en data/raw/")
+df_contacts=pd.read_csv(actual_file)
+```
+
+1. Con lo aprendido durante el desarrollo de 01_explore_regions.ipynb, se trabajo la ruta del DataFrame inicial con pathlib, y seguí las mismas convenciones ya definidas allí.
+2. ```current_directory=Path.cwd()```genera una ruta como objeto a la que le puedo aplicar los métodos de pathlib.
+3. ```project_root=current_directory.parent```, por ejemplo, .parent me devuelve la ruta inmediatamente anterior a la que obtuve en el primer comando.
+4. ```actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"```, aquí "/" funciona como un concatenador. project_root llega hasta ~/Escritorio/Hito1. Lo que concateno con "/" avanza desde ese primer nivel hasta llegar al archivo CSV.
+5. En ```if not actual_file.exists():```compruebo la existencia del archivo (último nivel) de la línea anterior. Si el archivo no existe, que es la condición del if, raise me devuelve el error concreto y un mensaje de depuración para el usario.
+6. Por último, cargo el DataFrame utilizando el nombre de la variable actual_file. Con esto consigo mayor robustez y flexibilidad en el manejo de ruta. Robustez, porque es menos probable que si alguien corre este código en mi máquina reciba un error; flexibilidad, porque la ruta deja de estar tan atada a mi máquina y es más probable que funcione en una diferente.
+
+## Segundo módulo: comprobación de datos
+
+**Advertencia:**
+Probablemente este módulo desaparecerá en main.py, pues es una comprobación que usé para determinar que el largo del DataFrame coincide con los casos identificados de consignación de los contactos en el DF original.
+
+```python
+nan_count=df_contacts["Contacto"].isna().sum()
+empty_count=(df_contacts["Contacto"].str.strip()=="").sum()
+only_number_count=df_contacts["Contacto"].str.replace(" ","").str.replace(".","").str.isdigit().sum()
+anythin_else_count=(df_contacts["Contacto"].str.contains(" - | / |Cel|Correo|@", na=False).sum())
+print(only_number_count+nan_count+empty_count+anythin_else_count)
+```
+1. Sé que el DataFrame original consiste en 135 filas.
+2. Con ```nan_count=df_contacts["Contacto"].isna().sum()```compruebo la cantidad de esos valores por fila y columna específica que son NaN. (Recordar que NaN es especial: es un float que devuelve True, a diferencia de 0.0 que es un float que devuelve False. Por eso, NaN se debe comprobar de esta manera en concreta y no simplemente como si fuera un vacío, pues es su propio tipo de datos.).
+3. Con ```empty_count=(df_contacts["Contacto"].str.strip()=="").sum()```compruebo la cantidad de datos efectivamente vacíos. Debo hacer strip porque una celda puede parecer vacía, pero contener espacios, que no son vacíos.
+4. ```only_number_count=df_contacts["Contacto"].str.replace(" ","").str.replace(".","").str.isdigit().sum()```compruebo la cantidad de valores que son únicamente númericos. Remuevo todos los espacios con replace y preveo que no hayan número separados por puntos para más seguridad. Una vez hecho eso, con isdigit obtengo True/False para cada valor. Como True es 1 y False es 0, sum hace la sumatoria total.
+5. ```anythin_else_count=(df_contacts["Contacto"].str.contains(" - | / |Cel|Correo|@", na=False).sum())```si algo no es NaN, vacío o numérico, es porque contiene otras cosas. Los casos identificados fueron: Tel único (se comprueba con la línea anterior), Correo único (cabe dentro de esta línea al no ser NaN, vacío o numérico), Tel/Correo, Tel-Correo. Estos tres últimos casos caben aquí. Si el valor contiene - o / o Cel o Correo o @, se cuenta aquí. na=false para que omita los NaN (primera línea de verificación). El operador pipe "|" funciona como la conjunción "o" en pandas.
+6. El resultado: 135, esto quiere decir que no se me escapó ningun patrón.
+7. El último print es evidencia del funcionamiento de la lógica que sigue. No se elimina.
+
+## Tercer módulo: división de los valores mezclados
+```python
+def split_phone_email(text):
+    if pd.isna(text) or not text:
+        return ["Sin dato"]
+    elif text.startswith("Cel:"):
+        return text.replace("Cel: ","").replace("Cel:","").replace(" ","").split("Correo:")
+    elif text.startswith("Correo:"):
+        return text.replace("Correo:","").replace("Correo: ","").replace(" ","").split("Cel:")
+    elif "/" in text:
+        return text.replace(" ","").split("/")
+    elif "-" in text:
+        return text.replace(" ","").split("-")
+    else:
+        return text.split()
+phone_email=df_contacts["Contacto"].apply(split_phone_email).tolist()
+print(phone_email)
+```
+1. Esta función divide el correo del teléfono, así:
+2. ```python
+    if pd.isna(text) or not text:
+        return ["Sin dato"]
+    ```
+    Si algo es NaN o vacío, la función devuelve una marca "Sin dato".
+3. ```python
+        elif text.startswith("Cel:"):
+        return text.replace("Cel: ","").replace("Cel:","").replace(" ","").split("Correo:")
+    ```
+    Si el valor de la celda comienza con "Cel:", elimino esa marca en dos casos: "Cel: " y "Cel:", así evito verificar manualmente si alguno de esos casos no existe, pues me adelanto. Elimino el resto de espacios (aunque, ahora que lo pienso, debo invertir el orden para evitar el doble replace de "Cel", es decir, primero eliminar los espacios y así quedaría un solo caso "Cel:" y ningún "Cel: ").
+
+    Después, divido por "Correo:" (el str por el que divido no se incluye en el output).
+4. ```python
+    elif text.startswith("Correo:"):
+        return text.replace("Correo:","").replace("Correo: ","").replace(" ","").split("Cel:")
+    ```
+    Mismo comentario anterior, pero con el orden inverso: remplazo "Correo" y divido por "Cel".
+5. ```python
+    elif "/" in text:
+        return text.replace(" ","").split("/")
+    elif "-" in text:
+        return text.replace(" ","").split("-")
+    ```
+    Misma lógica de los puntos 3 y 4.
+6. ```python
+    else:
+        return text.split()
+    ```
+    Esta línea es especial: es muy importante mantener la consistencia del output para que no haya posibles errores al trabajar sobre él. La naturaleza de .split() siempre devuelve una lista, por eso tengo que hacer esto, para que cualquier otro caso no me devuelva un valor que no sea lista.
+7. ```python
+    phone_email=df_contacts["Contacto"].apply(split_phone_email).tolist()
+    ```
+    Ahora, aplico esta función a la columna "Contacto" del DataFrame. Como son valores tipo serie, debo usar apply. Con tolist() convierto el output en una lista. Aunque no sé si es redundante dada la naturaleza de split.
+8. El último print era de depuración, se eliminará.
+
+## Cuarto módulo: definición concreta de lo que es teléfono y de lo que es correo
+
+```python
+def is_phone_email(row):
+    if len(row)==1:
+        if row[0].replace(" ","").isdigit():
+            phone=row[0]
+            email="Sin dato"
+        elif "@" in row[0]:
+            phone="Sin dato"
+            email=row[0]
+        elif row[0].replace("@","").replace("_","").replace(".","").isalpha():
+            phone="Sin dato"
+            email=row[0]
+        elif row[0]=="Sin dato":
+            phone="Sin dato"
+            email="Sin dato"
+    else:
+        if row[0].replace(" ","").isdigit():
+            phone=row[0]
+            email=row[1]
+        elif "@" in row[0]:
+            phone=row[1]
+            email=row[0]
+        elif row[0].replace("@","").replace("_","").replace(".","").isalpha():
+            phone=row[1]
+            email=row[0]
+        else:
+            phone="Sin dato"
+            email="Sin dato"
+
+    return phone, email
+
+results=[]
+for row in phone_email:
+    results.append(is_phone_email(row))
+print (results)
+```
+Esto fue de lo que más me costó entender. La lógica es la siguiente:
+1. En el último ciclo for itero cada elemento tipo lista de la "macrolista" phone_email generada en la función anterior.
+2. Genero una nueva lista con los valores separados por correo y por teléfono. Eso es ```results.append(is_phone_email(row))```
+3. Ese ```print(results)```es de depuración, se eliminará.
+4. La pregunta es: ¿cómo ese ciclo for utiliza la función? Veamos.
+    - La función lo que hace es tomar cada elemento y definir su longitud con len(row).
+    - Si la longitud es ==1, entonces hay 3 posibilidad:
+        - El contenido es "Sin dato", solo un correo o solo un teléfono.
+        - Luego verifico caso por caso: si es numérico, entonces es teléfono.
+        - Si no es numérico y contiene "@", entonces es correo.
+        - Si no es numérico y no contiene "@" (a algún usuario se le puede pasar), entonces verifico si es alfabético, en cuyo caso es correo. Traté de introducir las cosas más comunes usadas en los correo: _,-,. (pero ahora que lo veo, también debo filtrar números, pues muchos correos se crean con números).
+        - Si no es nada de lo anterior, entonces es "Sin dato".
+    - Si la longitud es >1, entonces hay 3 posibilidad:
+        - Si la posición inicial de la dupla dígito, entonces la segunda es correo.
+        - Si la posición inicial es correo, la segunda es teléfono.
+        - En cualquier otro caso, no hay datos.
+        - Funciona con las mismas comprobaciones del primer caso (len==1).
+5. La función devuelve teléfono y correo, exactamente en ese orden y los asigna a la lista "results" con el for ya explicado.
+
+**Opciones usadas y descartadas:**
+```python
+# for element in phone_emails:
+#   element.replace(" ","").replace("@","").replace(".","")
+
+# if element.isdigit():
+#   emails.append("Sin dato")
+#   phones.append(element)
+# elif element=="Sin dato"
+#   emails.append("Sin dato")
+#   phones.append("Sin dato")
+```
+Estas líneas tienen un problema: funcionan, pero generan offsets entre las filas del DataFrame, es decir, emparejarían teléfonos y correos con las filas no correspondiente, porque si una comprobación falla, se salta a la siguiente sin haber clasificado correctamente el valor.
+
+## Quinto módulo: generación de dos nuevas columnas con sus valores definitivos.
+
+```python
+phone_list=[phone for phone,email in results]
+email_list=[email for phone,email in results]
+
+if "Teléfono" not in df_contacts.columns:
+    df_contacts.insert(loc=4,column="Teléfono",value=phone_list)
+
+if "Correo" not in df_contacts.columns:
+    df_contacts.insert(loc=5,column="Correo",value=email_list)
+
+if "Contacto" in df_contacts.columns:
+    df_contacts.drop(columns=["Contacto"],inplace=True)
+
+df_contacts
+```
+1. Utilizo comprensión de listas para generar dos listas con los valores ya clasificados.
+2. Esta comprensión desempaqueta las tuplas de una vez en su orden respectivo, por eso no es necesario usar los índices que usé en la función anterior. El resultado de la función anterior ya genera un orden concreto: primero teléfono y luego correo.
+3. Si la columna "Teléfono" no existe en el DataFrame, se crea en esa posición concreta con loc. Esta forma de crear columnas es inplace por defecto.
+4. Lo mismo para "Correo".
+5. Si la columna "Contacto" todavía existe, se elimina. Este método, por el contrario, no es inplace por defecto. Por tanto, se puede usar con seguridad para obviar valores que no quiero ver por cualquier motivo sin afectar el DataFrame original.
 
 # Oportunidades de mejora
 1. ¿Qué pasa si el usuario a una región le pone una tilde que no lleva?
