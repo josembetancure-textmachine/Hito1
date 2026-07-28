@@ -225,12 +225,15 @@ df_contacts=pd.read_csv(actual_file)
 3. ```project_root=current_directory.parent```, por ejemplo, .parent me devuelve la ruta inmediatamente anterior a la que obtuve en el primer comando.
 4. ```actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"```, aquí "/" funciona como un concatenador. project_root llega hasta ~/Escritorio/Hito1. Lo que concateno con "/" avanza desde ese primer nivel hasta llegar al archivo CSV.
 5. En ```if not actual_file.exists():```compruebo la existencia del archivo (último nivel) de la línea anterior. Si el archivo no existe, que es la condición del if, raise me devuelve el error concreto y un mensaje de depuración para el usario.
-6. Por último, cargo el DataFrame utilizando el nombre de la variable actual_file. Con esto consigo mayor robustez y flexibilidad en el manejo de ruta. Robustez, porque es menos probable que si alguien corre este código en mi máquina reciba un error; flexibilidad, porque la ruta deja de estar tan atada a mi máquina y es más probable que funcione en una diferente.
+6. Por último, cargo el DataFrame utilizando el nombre de la variable actual_file. Con esto consigo mayor robustez y flexibilidad en el manejo de ruta. Robustez, porque es menos probable que si alguien corre este código en su máquina reciba un error; flexibilidad, porque la ruta deja de estar tan atada a mi máquina y es más probable que funcione en una diferente.
 
 ## Segundo módulo: comprobación de datos
 
 **Advertencia:**
 Probablemente este módulo desaparecerá en main.py, pues es una comprobación que usé para determinar que el largo del DataFrame coincide con los casos identificados de consignación de los contactos en el DF original.
+
+**Nota:**
+No se eliminará, pues muestra que los casos identificados abarcan la completitud del DataFrame.
 
 ```python
 nan_count=df_contacts["Contacto"].isna().sum()
@@ -275,7 +278,7 @@ print(phone_email)
         elif text.startswith("Cel:"):
         return text.replace("Cel: ","").replace("Cel:","").replace(" ","").split("Correo:")
     ```
-    Si el valor de la celda comienza con "Cel:", elimino esa marca en dos casos: "Cel: " y "Cel:", así evito verificar manualmente si alguno de esos casos no existe, pues me adelanto. Elimino el resto de espacios (aunque, ahora que lo pienso, debo invertir el orden para evitar el doble replace de "Cel", es decir, primero eliminar los espacios y así quedaría un solo caso "Cel:" y ningún "Cel: ").
+    Si el valor de la celda comienza con "Cel:", elimino esa marca en dos casos: "Cel: " y "Cel:", así evito verificar manualmente si alguno de esos casos no existe, pues me adelanto. Elimino el resto de espacios (aunque, ahora que lo pienso, debo invertir el orden para evitar el doble replace de "Cel", es decir, primero eliminar los espacios y así quedaría un solo caso "Cel:" y ningún "Cel: "). **En el código final, se hizo esta corrección.**
 
     Después, divido por "Correo:" (el str por el que divido no se incluye en el output).
 4. ```python
@@ -298,7 +301,7 @@ print(phone_email)
 7. ```python
     phone_email=df_contacts["Contacto"].apply(split_phone_email).tolist()
     ```
-    Ahora, aplico esta función a la columna "Contacto" del DataFrame. Como son valores tipo serie, debo usar apply. Con tolist() convierto el output en una lista. Aunque no sé si es redundante dada la naturaleza de split.
+    Ahora, aplico esta función a la columna "Contacto" del DataFrame. Como son valores tipo serie, debo usar apply. Con tolist() convierto el output en una lista. El .tolist() es importante porque sin él, obtendría una serie. Las series son útiles para operaciones vectorizables, pero en este caso, necesito iterar valor por valor para definir si es teléfono o email según las condiciones impuestas.
 8. El último print era de depuración, se eliminará.
 
 ## Cuarto módulo: definición concreta de lo que es teléfono y de lo que es correo
@@ -312,12 +315,15 @@ def is_phone_email(row):
         elif "@" in row[0]:
             phone="Sin dato"
             email=row[0]
-        elif row[0].replace("@","").replace("_","").replace(".","").isalpha():
+        elif row[0].replace("@","").replace("_","").replace(".","").isalnum(): #Con isalnum, en vez de isalpha, obtengo más solidez, pues los números son comunes en los correos electrónicos.
             phone="Sin dato"
             email=row[0]
-        elif row[0]=="Sin dato":
+        else:
             phone="Sin dato"
-            email="Sin dato"
+            email="Sin dato" #Estas líneas cambiaron para más robustez. No dependo de que salte el elif, sino que atrapo cualquier cosa que no se ajuste a los datos anteriores.
+        # elif row[0]=="Sin dato":
+        #     phone="Sin dato"
+        #     email="Sin dato"
     else:
         if row[0].replace(" ","").isdigit():
             phone=row[0]
@@ -325,7 +331,7 @@ def is_phone_email(row):
         elif "@" in row[0]:
             phone=row[1]
             email=row[0]
-        elif row[0].replace("@","").replace("_","").replace(".","").isalpha():
+        elif row[0].replace("@","").replace("_","").replace(".","").isalnum(): #Con isalnum, en vez de isalpha, obtengo más solidez, pues los números son comunes en los correos electrónicos.
             phone=row[1]
             email=row[0]
         else:
