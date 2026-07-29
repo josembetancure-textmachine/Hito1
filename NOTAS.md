@@ -301,7 +301,7 @@ print(phone_email)
 7. ```python
     phone_email=df_contacts["Contacto"].apply(split_phone_email).tolist()
     ```
-    Ahora, aplico esta función a la columna "Contacto" del DataFrame. Como son valores tipo serie, debo usar apply. Con tolist() convierto el output en una lista. El .tolist() es importante porque sin él, obtendría una serie. Las series son útiles para operaciones vectorizables, pero en este caso, necesito iterar valor por valor para definir si es teléfono o email según las condiciones impuestas.
+    Ahora, aplico esta función a la columna "Contacto" del DataFrame. Como son valores tipo serie, debo usar apply. Con tolist() convierto el output en una lista. El .tolist() es importante porque sin él, obtendría una serie. Las series son útiles para operaciones vectorizables, pero en este caso, necesito iterar valor por valor para definir si es teléfono o email según las condiciones impuestas y el problema es que los valores de la lista no son uniformes (varían en longitud, pues "row" puede contener uno o dos elementos según el caso).
 8. El último print era de depuración, se eliminará.
 
 ## Cuarto módulo: definición concreta de lo que es teléfono y de lo que es correo
