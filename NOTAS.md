@@ -401,5 +401,17 @@ df_contacts
 4. Lo mismo para "Correo".
 5. Si la columna "Contacto" todavía existe, se elimina. Este método, por el contrario, no es inplace por defecto. Por tanto, se puede usar con seguridad para obviar valores que no quiero ver por cualquier motivo sin afectar el DataFrame original.
 
+# 03_explore_status.ipynb
+
+#df_status["Observaciones"] #Funciona para visualizar el contenido de una sola columna, pero devuelve una Serie no renderizada en HTML para verla en estilo DataFrame. Sucede porque le estoy dando un valor tipo str, en cuyo caso "desenvuelve" los valores de la columna y me entrega una Serie.
+# df_status[df_status["Observaciones"]] #No funciona si pretendo utilizarla para visualizar los valores de una sola columna, devuelve KeyError. Esta sintaxis filtra y se interpreta como los valores de la columna observaciones aplicados al DataFrame original. Esos valores son una Serie, como el caso de arriba y, al ser desenvueltos, se interpretan como nombres de columnas. Al no existir esas columnas, genera error. Esta sintaxis sirve para filtrar la columna según el contenido de sus valores, pues funciona como una máscara boleana. Es decir, si aplico un filtro a esos valores, serán True/False y solo veré en el output aquellos que sea True.
+df_status[["Observaciones"]] #Funciona también para visualizar los datos de una sola columna y se ve en formato DataFrame, estilo HTML. En este caso, estoy pasando una lista, por eso los corchetes dobles. No es que la lista se llame "Observaciones", sino que le estoy pidiendo que me muestre los elementos que contiene esa lista.
+
+Patrones:
+1. "Documentación incompleta"
+2. "Datos recolectados parcialmente"
+3. "Entrevisa exitosa"
+
+
 # Oportunidades de mejora
 1. ¿Qué pasa si el usuario a una región le pone una tilde que no lleva?
