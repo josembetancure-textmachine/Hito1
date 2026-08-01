@@ -407,11 +407,85 @@ df_contacts
 # df_status[df_status["Observaciones"]] #No funciona si pretendo utilizarla para visualizar los valores de una sola columna, devuelve KeyError. Esta sintaxis filtra y se interpreta como los valores de la columna observaciones aplicados al DataFrame original. Esos valores son una Serie, como el caso de arriba y, al ser desenvueltos, se interpretan como nombres de columnas. Al no existir esas columnas, genera error. Esta sintaxis sirve para filtrar la columna según el contenido de sus valores, pues funciona como una máscara boleana. Es decir, si aplico un filtro a esos valores, serán True/False y solo veré en el output aquellos que sea True.
 df_status[["Observaciones"]] #Funciona también para visualizar los datos de una sola columna y se ve en formato DataFrame, estilo HTML. En este caso, estoy pasando una lista, por eso los corchetes dobles. No es que la lista se llame "Observaciones", sino que le estoy pidiendo que me muestre los elementos que contiene esa lista.
 
-Patrones:
-1. "Documentación incompleta"
-2. "Datos recolectados parcialmente"
-3. "Entrevisa exitosa"
+## Patrones identificados en el DataFrame y primera definición de criterios:
+1. "Todo normal" o "Sin novedad", siempre aparecen juntos. ("Sin novedad en el registro. Todo normal" y "Todo normal, sin novedad".). En esta categoría se incluirá tambień "Entrevista exitosa", pues en los 3 casos se implica que no hay nada que vigilar.
+2. Definición de criterios urgente vs. prioritario vs. importante para el caso:
+    - "Urgente" y "riesgo" son sinónimos, pues su contextos de uso connotan una afectación potencial para la vida o la salud.
+    - "Prioritario" es un caso aparte, pues connota una afectación a los derechos (escolarización y firma de documentos para correcto registro). Bajo este argumento, las entradas relativas a documentos incompletos son de carácter prioritario ("Documentación incompleta").Menos grave que "urgente" (la única excepción es la entrada "Urgente: Revisar documentos faltantes", pues combina dos criterios: la urgencia y la documentación. Se tratará como "Urgente" bajo el argumento de que es una marca explícita).
+    - "Importante" es el último nivel, pues no implica una afectación a la vida o a los derechos.
+3. "Datos recolectados parcialmente" y "Datos incompletos por lluvia" son equivalentes.
 
+## Patrones identificados en el DataFrame: imposición de criterios de análisis.
+
+Los criterios que se presentan aquí tratan de responder a la pregunta sobre el propósito del DataFrame: ¿para qué se recolectan este tipo de datos? Las políticas públicas usan este tipo de datos para brindar ayuda a la población vulnerable. Puede que en un momento inicial no tengan ese propósito excplícito, pero después pueden llegar a tenerlo.
+
+Así, se definen cuatro niveles:
+1. Urgente: en el DataFrame, el contexto de uso de urgente aparece asociado a la palabra "riesgo". Esta categoría implica una afectación potencial a la vida o a la salud. Estado: rojo.
+    - "Urgente: Riesgo de inundación detectado en el sector."
+    - "Riesgo detectado en zona norte."
+    - "Vivienda con fallas estructurales. Es urgente la intervención."
+    - "Urgente: Revisar documentos faltantes." **(excepción: por los criterios usados, este caso pertenecería a prioritario; sin embargo, como la marca es explícita, se considerará "urgente")**.
+    - Palabras clave: "urgente", "riesgo", "fallas estructurales", "falla estructural".
+2. Prioritario: connota una afectación a los derechos (escolarización o documentos/datos incompletos que afecten el acceso a las políticas públicas). Estado: naranja.
+    - "Documentación incompleta."
+    - "Datos recolectados parcialmente."
+    - "Prioritario: Familia con 5 menores sin escolarización."
+    - "El habitante no se encontraba. Prioritario volver mañana."
+    - "Prioritario volver mañana por firma."
+    - "Datos incompletos por lluvia."
+    - Palabras clave: "prioritario", "datos incompletos", "dato incompleto", "documentación incompleta", "datos recolectados parcialmente".
+3. Importante: no implica una afectación a la vida o a los derechos, pero no fue una entrevista exitosa. Estado: amarillo.
+    - "Importante: El informante no habla mucho."
+    - "Importante: Requiere validación de linderos."
+    - "Zona de difícil acceso por lluvias. Importante avisar a transporte."
+    - Palabras clave: "importante".
+4. Exitoso: entrevista normal, exitosa o sin novedad. Estado: verde.
+    - "Sin novedad en el registro. Todo normal."
+    - "Todo normal, sin novedad."
+    - "Entrevista exitosa."
+    - Palabras clave: "exitosa", "sin novedad", "normal".
+
+**Consideraciones sobre el alcance:**
+No es un proyecto de análisis semántico, sino de análisis de datos. No tengo las herramientas para el primer caso, por tanto, me limito al segundo a través del rastreo de palabras clave y regex.
+
+Esta muestra contiene casos estandarizados. Validar casos como: "los datos no fueron recogidos en su totalidad" o "no se pudo realizar la visita", etc., que no se puedan definir con regex, requerirían otras herramientas de análisis semántico que aun no conozco.
+
+```python
+#Aproximaciones:
+#¿De verdad es necesaria una función para esto?
+#status_red=df_status[(df_status["Observaciones"].str.contains("urgente|riesgo|fallas estructurales|falla estructural", case=False))]
+status_red=df_status["Observaciones"].str.contains("urgente|riesgo|fallas estructurales|falla estructural", case=False)
+# status_orange=df_status.loc[(df_status["Observaciones"].str.contains("prioritario|datos incompletos|dato incompleto|documentación incompleta|datos recolectados parcialmente", case=False))]
+# status_yellow=df_status.loc[(df_status["Observaciones"].str.contains("importante", case=False))]
+# status_green=df_status.loc[(df_status["Observaciones"].str.contains("exitosa|sin novedad|normal", case=False))]
+# total_red=len(status_red)
+# total_orange=len(status_orange)
+# total_yellow=len(status_yellow)
+# total_green=len(status_green)
+# print(total_red+total_orange+total_yellow+total_green) #Output: 135, quiere decir que no se deja ningún caso por fuera.status_red=df_status.loc[(df_status["Observaciones"].str.contains("urgente|riesgo|fallas estructurales|falla estructural", case=False))]
+```
+Todo esto merece una explicación detallada:
+1. Primera línea de código:
+    - ¿Qué me devuelve?: un pandas.DataFrame
+    - ¿Conserva el índice? Sí
+    - Si lo convierto a lista, ¿conservaría el índice?: No
+    - ¿Qué significa que me devuelva un pandas.DataFrame?: que obtengo un output en 2D, no una máscara boleana.
+2. Segunda línea de código (la no comentada):
+    - ¿Qué me devuelve?: un pandas.Series
+    - ¿Conserva el índice?: sí
+    - ¿Qué significa que me devuelva un pandas.Series?: las series también funcionan como máscaras boleanas cuando son de tipo bool **(ojo: no cualquier Series funciona como filtro, algunas son solo datos)**. Es decir, esa máscara se la puedo aplicar a un DataFrame. Ejemplo:
+        ```python
+        df_status.loc[status_red]
+        ```
+    - ¿Qué me devuelve?: un pandas.DataFrame con la máscara boleana aplicada.
+3. ¿Cómo se relacionan el punto uno y dos?
+    - No puedo aplicar un pandas.DataFrame a un pandas.DataFrame con .loc por cuestión de dimensiones: .loc espera algo en una dimensión para responder sí/no a algo concreto. Los DataFrame son bidimensionales, por eso el error es "Cannot index with multidimensional key".
+    - df_status ya es un pandas.DataFrame y el resultado de la primera línea de código es del mismo tipo.
+    - Por eso, no puedo hacer esto mismo con ```df_status.loc[status_red]```si status_red es un pandas.DataFrame, arroja error.
+
+En conclusión: la sintaxis de las líneas comentadas es la máscara boleana ya aplicada al DataFrame original para generar un **nuevo** DataFrame filtrado. El resultado de la sintaxis no comentada no genera un nuevo DataFrame, sino que genera una **serie** que me puede servir para filtar un DataFrame.
+
+Es importante tener en cuenta que .loc es **inplace** por defecto cuando se usa como asignador .loc[máscara,"Estado"]=x, si se usa como lector .loc[máscara], el DataFrame original queda intacto.
 
 # Oportunidades de mejora
 1. ¿Qué pasa si el usuario a una región le pone una tilde que no lleva?
