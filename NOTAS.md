@@ -403,11 +403,24 @@ df_contacts
 
 # 03_explore_status.ipynb
 
-#df_status["Observaciones"] #Funciona para visualizar el contenido de una sola columna, pero devuelve una Serie no renderizada en HTML para verla en estilo DataFrame. Sucede porque le estoy dando un valor tipo str, en cuyo caso "desenvuelve" los valores de la columna y me entrega una Serie.
-# df_status[df_status["Observaciones"]] #No funciona si pretendo utilizarla para visualizar los valores de una sola columna, devuelve KeyError. Esta sintaxis filtra y se interpreta como los valores de la columna observaciones aplicados al DataFrame original. Esos valores son una Serie, como el caso de arriba y, al ser desenvueltos, se interpretan como nombres de columnas. Al no existir esas columnas, genera error. Esta sintaxis sirve para filtrar la columna según el contenido de sus valores, pues funciona como una máscara boleana. Es decir, si aplico un filtro a esos valores, serán True/False y solo veré en el output aquellos que sea True.
-df_status[["Observaciones"]] #Funciona también para visualizar los datos de una sola columna y se ve en formato DataFrame, estilo HTML. En este caso, estoy pasando una lista, por eso los corchetes dobles. No es que la lista se llame "Observaciones", sino que le estoy pidiendo que me muestre los elementos que contiene esa lista.
+## Primer módulo: generación del DataFrame necesario
 
-## Patrones identificados en el DataFrame y primera definición de criterios:
+```python
+current_directory= Path.cwd()
+project_root=current_directory.parent
+actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
+
+if not actual_file.exists():
+    raise FileNotFoundError("Falta el insumo de trabajo. Debe nombrarlo como \"datos_sucios_hito1.csv\" y guardarlo en data/raw/")
+df_status=pd.read_csv(actual_file)
+```
+**Conocimientos importantes que salieron de este primer módulo**
+1. ```df_status["Observaciones"]``` Funciona para visualizar el contenido de una sola columna, pero devuelve una Serie no renderizada en HTML para verla en estilo DataFrame. Sucede porque le estoy dando un valor tipo str, en cuyo caso "desenvuelve" los valores de la columna y me entrega una Serie.
+2. ```df_status[df_status["Observaciones"]]```No funciona si pretendo utilizarla para visualizar los valores de una sola columna, devuelve KeyError. Esta sintaxis filtra y se interpreta como los valores de la columna observaciones aplicados al DataFrame original. Esos valores son una Serie, como el caso de arriba y, al ser desenvueltos, se interpretan como nombres de columnas. Al no existir esas columnas, genera error. Esta sintaxis sirve para filtrar la columna según el contenido de sus valores, pues funciona como una máscara boleana. Es decir, si aplico un filtro a esos valores, serán True/False y solo veré en el output aquellos que sea True.
+3. ```df_status[["Observaciones"]]```Funciona también para visualizar los datos de una sola columna y se ve en formato DataFrame, estilo HTML. En este caso, estoy pasando una lista, por eso los corchetes dobles. No es que la lista se llame "Observaciones", sino que le estoy pidiendo que me muestre los elementos que contiene esa lista.
+
+## Segundo módulo: patrones identificados en el DataFrame para la columna observaciones
+### Primera definición de criterios:
 1. "Todo normal" o "Sin novedad", siempre aparecen juntos. ("Sin novedad en el registro. Todo normal" y "Todo normal, sin novedad".). En esta categoría se incluirá tambień "Entrevista exitosa", pues en los 3 casos se implica que no hay nada que vigilar.
 2. Definición de criterios urgente vs. prioritario vs. importante para el caso:
     - "Urgente" y "riesgo" son sinónimos, pues su contextos de uso connotan una afectación potencial para la vida o la salud.
@@ -415,9 +428,12 @@ df_status[["Observaciones"]] #Funciona también para visualizar los datos de una
     - "Importante" es el último nivel, pues no implica una afectación a la vida o a los derechos.
 3. "Datos recolectados parcialmente" y "Datos incompletos por lluvia" son equivalentes.
 
-## Patrones identificados en el DataFrame: imposición de criterios de análisis.
+### Patrones identificados en el DataFrame: imposición de criterios de análisis.
 
 Los criterios que se presentan aquí tratan de responder a la pregunta sobre el propósito del DataFrame: ¿para qué se recolectan este tipo de datos? Las políticas públicas usan este tipo de datos para brindar ayuda a la población vulnerable. Puede que en un momento inicial no tengan ese propósito excplícito, pero después pueden llegar a tenerlo.
+
+**Nota:**
+*Cómo se verá más adelante, estos patrones se construyeron inicialmente a través de la identificación de palabras clave. Sin embargo, el código final se construyó con regex para abarcar más casos de los aquí mencionados.*
 
 Así, se definen cuatro niveles:
 1. Urgente: en el DataFrame, el contexto de uso de urgente aparece asociado a la palabra "riesgo". Esta categoría implica una afectación potencial a la vida o a la salud. Estado: rojo.
@@ -449,6 +465,9 @@ Así, se definen cuatro niveles:
 No es un proyecto de análisis semántico, sino de análisis de datos. No tengo las herramientas para el primer caso, por tanto, me limito al segundo a través del rastreo de palabras clave y regex.
 
 Esta muestra contiene casos estandarizados. Validar casos como: "los datos no fueron recogidos en su totalidad" o "no se pudo realizar la visita", etc., que no se puedan definir con regex, requerirían otras herramientas de análisis semántico que aun no conozco.
+
+**Exploración de conceptos**
+*Esto no refleja el código final. Se trata de una fase exploratoria que se deja consignada porque de aquí se obtuve un gran aprendizaje.*
 
 ```python
 #Aproximaciones:
@@ -486,6 +505,56 @@ Todo esto merece una explicación detallada:
 En conclusión: la sintaxis de las líneas comentadas es la máscara boleana ya aplicada al DataFrame original para generar un **nuevo** DataFrame filtrado. El resultado de la sintaxis no comentada no genera un nuevo DataFrame, sino que genera una **serie** que me puede servir para filtar un DataFrame.
 
 Es importante tener en cuenta que .loc es **inplace** por defecto cuando se usa como asignador .loc[máscara,"Estado"]=x, si se usa como lector .loc[máscara], el DataFrame original queda intacto.
+
+**Código definitivo: regex y máscara boleana**
+
+```Python
+fil_red=df_status["Observaciones"].str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False)
+fil_orange=df_status["Observaciones"].str.contains(r"prioritario|incomplet[ao]?s?\b|recolec\w*\b.*parcial\w*\b",case=False)
+fil_yellow=df_status["Observaciones"].str.contains("important", case=False)
+fil_green=df_status["Observaciones"].str.contains(r"[ée]xito[s]?[oa]?|sin novedad|normal", case=False)
+
+print(fil_red.sum()+fil_orange.sum()+fil_yellow.sum()+fil_green.sum())
+```
+*Estas líneas son la versión con regex de las que se usaron y fueron descartadas (ver más arriba).*
+
+1. fil_red incluye los strings literales "urgente" y "riesgo". Para los demás casos, se usa regex, así:
+    - ```fall[ao]s?\b\s*estructural[e]?s?\b```significa: la coincidencia literal "fall" seguida de "a" u "o", seguida de una "s" opcional, fin de palabra y cualquier cantidad de espacios antes de la coincidencia literal "estructural" seguida de una "e" opcional, seguida de una "s" opcional, fin de palabra. Eso permite casos como "falla estructural", "fallas estructurales", "fallo estructural", "fallos estructurales", "fallo estructurales", "falla estructurales", "falla estructurals", etc.
+2. file_orange incluye el string literal "prioritario". Para los demás casos, se usa regex, así:
+    - ```incomplet[ao]?s?\b```significa: la coincidencia literal "incomplet" seguida de "a" u "o", seguido de una "s" opcional, fin de palabra. Eso encuentra cosas como "incompleta", "incompleto", "incompletas", "incompletos".
+    - ```recolec\w*\b.*parcial\w*\b```significa: la coincidencia exacta "recolec" seguida de cualquier carácter admitido por \w (dígitos, letras mayúscuas o minúsculas con o sin tilde) cualquier cantidad de veces, fin de palabra. Eso abarca cosas como "recolecta", "recolectados", "recolección", "recolectando", "recolectar", etc. Eso seguido de cualquier carácter cualquier cantidad de veces, seguido de la coincidencia exacta "parcial", seguido de cualquier carácter admitido por \w cualquier cantidad de veces, fin de palabra. Con eso puedo abarcar desde "recolectados parcialmente" hasta "recolectando de forma parcial".
+3. fil_yellow incluye el string literal "important" y no necesito nada más, porque ese es un substring de todas las palabras importantes en este caso: importante, importantes, etc. Nota aparte: se verificó que "important" (sin la "e" final) no genera falsos positivos con palabras como "importación" o "importador" (que sí coincidirían con el prefijo más corto "import"), a diferencia de lo que se podría pensar. Este hallazgo no fue el motivo original para usar "important" — fue una corrección de un error de tipeo —, pero es una propiedad útil del patrón que vale la pena dejar registrada para el futuro.
+4. fil_green incluye los strings literales "sin novedad" y "normal". Para los demás casos, se usa regex, así:
+    - ```[ée]xito[s]?[oa]?```significa: "é" o "e" seguida del string literal "xito" seguida de una "s" opcional, seguida de "o" o "a" opcional. Así abarco palabras clave como "éxito" ("datos recolectados con éxito"), "exitosa" ("entrevista exitosa"), "exitoso" ("encuentro exitoso").
+5. La última línea, el print, me sirve para tener un conteo de la cantidad de casos que estoy abarcando con esto: todo esto me da 135, que es justo el largo de DataFrame. Quiere decir que no estoy dejando casos por fuera.
+
+## Tercer módulo: generación del DataFrame con la nueva columna "Estado"
+
+```python
+df_status["Estado"] = pd.NA
+
+df_status.loc[fil_red,"Estado"]="Rojo"
+df_status.loc[fil_orange,"Estado"]="Naranja"
+df_status.loc[fil_yellow,"Estado"]="Amarillo"
+df_status.loc[fil_green,"Estado"]="Verde"
+df_status
+```
+1. La primera línea es profiláctica: si la columna no existe, la crea y asigna todos sus valores a NaN. Si ya existe, ajusta todos sus valores a NaN. ¿Por qué? Porque si hay un cambio en el código anterior, puede que algunos casos entren y otros salgan de la máscara boleana, es decir, que cambien de estado: lo que era True se haga False y viceversa. .loc solo trabaja sobre lo True y lo False permanece igual. Entonces, todo lo que se volvió False y antes era True, se conservaría tal cual. Es decir, quedarían filtros aplicados de iteraciones pasadas. Si cada vez que ejecuto el código vuelvo todo NaN, omito ese problema.
+2. Aplico la máscara boleana al DataFrame por cada estado. Al final, obtengo un solo DataFrame con las máscaras aplicadas.
+
+## Cuarto módulo: reordenamiento de columnas
+
+```Python
+first_cols=[col for col in df_status.columns if col not in ["Observaciones","Estado"]]
+new_order=first_cols+["Observaciones","Estado"]
+df_status=df_status[new_order]
+df_status
+```
+1. Genero una lista que contiene las columnas que no son ni "Observaciones" ni "Estado" (justo las dos columnas que quiero dejar para el final del DataFrame).
+2. Genera una nueva lista con el orden deseado: primero las columnas que no son "Observaciones" ni "Estado" y después estas dos.
+3. Para que el cambio sea efectivo, debo hacer que el DataFrame original sea igual al DataFrame original con el orden cambiado. 
+
+Esta sintaxis me ahorra escribir cada columna en el orden deseado: ```df_status["A","B","C","Observaciones","Estado"]```
 
 # Oportunidades de mejora
 1. ¿Qué pasa si el usuario a una región le pone una tilde que no lleva?
