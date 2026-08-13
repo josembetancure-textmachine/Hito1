@@ -556,5 +556,98 @@ df_status
 
 Esta sintaxis me ahorra escribir cada columna en el orden deseado: ```df_status["A","B","C","Observaciones","Estado"]```
 
+# 04_explore_names-dates.ipynb
+
+## Primer módulo: generación del DataFrame necesario
+
+```python
+current_directory= Path.cwd()
+project_root=current_directory.parent
+actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
+
+if not actual_file.exists():
+    raise FileNotFoundError("Falta el insumo de trabajo. Debe nombrarlo como \"datos_sucios_hito1.csv\" y guardarlo en data/raw/")
+df_namedates=pd.read_csv(actual_file)
+df_namedates
+```
+## Segundo módulo: normalización de nombres
+
+```python
+names_nodata=df_namedates["Nombre_Informante"].isna()|(df_namedates["Nombre_Informante"].str.replace(" ","")=="")|(df_namedates["Nombre_Informante"].str.contains("N/A",case=False))|(df_namedates["Nombre_Informante"].str.contains("No registra",case=False))
+df_namedates.loc[names_nodata,"Nombre_Informante"]="Sin dato"
+
+names_data=df_namedates["Nombre_Informante"]!="Sin dato"
+df_namedates.loc[names_data,"Nombre_Informante"]=df_namedates.loc[names_data,"Nombre_Informante"].str.title()
+df_namedates
+```
+1. names_nodata es una máscara boleana que luego se aplica a df_namesdata para que, todo lo que sea True en esa máscara, pase a ser "Sin dato". Por eso, la máscara incluye valores NaN, o valores que después de eliminar los espacios quedan vacíos, o valores "N/A" o "No registra".
+    - ```(df_namedates["Nombre_Informante"].str.replace(" ","")=="")```esta condición de la línea es particularmente interesante: nótese que todo lo demás devuelve un boleano, pero replace no devuelve boleano, sino str. Por eso debo incluir =="", lo que lo convierte en esto: ¿después de eliminar los espacios, lo que queda es igual a vacío? Esa respuesta si es boleana.
+2. Aplico esa máscara boleana a df_namedates y, como dije, todo lo que es True ahora es "Sin dato".
+3. Luego defino otra máscara names_data, la cual consiste en todos los valores que sean diferentes a "Sin dato".
+4. Esa máscara la aplico a df_namedates para que a todo lo que sea diferente a "Sin dato" se le aplique .title. De esa manera, no queda "Sin Dato" y los nombres quedan con sus respectivas mayúsculas.
+5. La línea df_namedates solo la usé para ver el resultado. No quedará en main.py
+
+**Código usado y descartado:**
+
+```python
+# for name in names:
+#     if pd.isna(name):
+#         name="Sin dato"
+#     elif name.replace(" ","")=="":
+#         name="Sin dato"
+
+#     names_lower.append(name.lower())
+
+# print(names_lower)
+```
+**¿Por qué se descartó**
+Porque el código anterior, si bien funciona (no está terminado, lo abandoné antes de terminarlo) es una forma complicada de hacer lo que deseo: filtar NaN y vacíos y pasar todo a minúsculas. Es una operación vectorizable que puedo realizar en el DataFrame directamente a través de máscaras boleanas.
+
+## Tercer módulo: normalizar fechas (patrón de letras a números)
+
+```python
+months_map = {
+    "Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04",
+    "May": "05", "Jun": "06", "Jul": "07", "Aug": "08",
+    "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12"
+}
+
+def numeric_month(match):
+    text_month=match.group("month")
+    return f"{match.group("day")}/{months_map[text_month]}/{match.group("year")}"
+
+df_namedates["Fecha_Registro"]=df_namedates["Fecha_Registro"].str.replace(r"(?P<month>\w{3})\s*(?P<day>\d{2}),\s*(?P<year>\d{2,4})",numeric_month,regex=True)
+df_namedates[["Fecha_Registro"]]
+```
+1. Defino un diccionario que me permitirá mapear los meses. En este diccionario, la llave es el mes y el valor es su número correspondiente.
+2. Defino una función recibe como argumento el match que extraigo con regex, así:
+    - ```df_namedates["Fecha_Registro"]=df_namedates["Fecha_Registro"].str.replace(r"(?P<month>\w{3})\s*(?P<day>\d{2}),\s*(?P<year>\d{2,4})",numeric_month,regex=True)```esta línea dice: encuentre 3 letras consecutivas y agrúpelas bajo el nombre "month", seguidas de cualquier cantidad de espacios, seguidos de dos dígitos consecutivos agrupados bajo el nombre "day", seguidos de coma y cualquier cantidad de espacios, seguidos de 2 o 4 dígitos consecutivos agrupados bajo el nombre "year".
+    - Ese patrón, lo va a reemplazar (aunque lo correcto sería decir "reordenar en este caso) según lo que devuelva la función.
+3. La función le asigna a una variable text_month el nombre del mes capturado con regex. Es decir, las 3 letras consecutivas.
+4. La función devuelve el grupo "day"/el valor para la llave text_month/el grupo "year".
+5. La línea df_namedates[["Fecha_Registro"]] solo la usé para visualizar. No se compila en main.py.
+
+## Cuarto módulo: normalizar fechas en orden día/mes/año
+
+```python
+#df_namedates["Fecha_Registro"].str.extract(r"(?P<a>\d{2,4})[-/](?P<b>\d{2})[-/](?P<c>\d{2,4})")
+
+def month_year_date(match):
+    #Por consistencia del DataSet y el contexto de uso, se asume que la posición b siempre es mes.
+    # if len(match.group("a"))==2 and match.group("a")>12:
+    #     return f"{match.group("a")}/{match.grouo("b")}/{match.group("c")}" #La primera posición puede ser año, mes o día. Si tiene 2 digítos y es mayor a 12, es día, en cuyo caso la segunda posición solo puede ser mes y la tercera año (pues, año nunca aparece en el medio).
+    if len(match.group("a"))==2: 
+        return f"{match.group("a")}/{match.group("b")}/{match.group("c")}" #Esta condición resume la primera posición. Si tiene dos dígitos, se asume SIEMPRE que es día por la consistencia de los datos, pues incluso si es igual o menor a 12, es imposible saber si es mes o día. Pero, además, el patrón Mes-Día-Año no se usa en el contexto de este DataSet.
+    #elif len(match.group("a"))==4 and int(match.group("b"))<=12: #Lo que viene después del "and" sobra: es una medida de seguridad que NO determina si en el medio hay un mes o un día, pero que puede reducir el riesgo de que se trate de un día. Sin embargo, sobra, es sobreingeniería, porque el patrón Año-Día-Mes no se usa.
+    else:
+        return f"{match.group("c")}/{match.group("b")}/{match.group("a")}"
+
+df_namedates["Fecha_Registro"]=df_namedates["Fecha_Registro"].str.replace(r"(?P<a>\d{2,4})[-/](?P<b>\d{2})[-/](?P<c>\d{2,4})",month_year_date,regex=True)
+df_namedates
+```
+**Nota:**omitir lo que está comentado, pues el código final no lo tiene. Los comentarios se dejan para discernir el proceso de razonamiento detrás de este código.
+
+No es necesaria una explicación, pues este módulo funciona de manera similar al anterior.
+
 # Oportunidades de mejora
 1. ¿Qué pasa si el usuario a una región le pone una tilde que no lleva?
