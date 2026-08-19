@@ -1,3 +1,11 @@
+# Contexto
+
+Este proyecto surgió como etapa inicial de mi camino de aprendizaje autónomo, el cual abarca Python, pandas, SQL, PyTorch y demás herramientas que me permitan dedicarme a NLP en un lapso de 2 años.
+
+Ante el uso de la IA como generadora de código, estas notas pretenden, primero, ser una evidencia de mi proceso de pensamiento a medida que construía el código y, segundo, demostrar que interioricé los conceptos usados. Por supuesto, me apoyé en Claude como "instructor particular" para que me explicara qué debía usar, cómo y cuándo, mas no como programada mediante _prompting_ o _vibe coding_. Todo lo construido en este proyecto fue hecho por mí.
+
+Las funciones usadas en este proyecto están debidamente comentadas en cada uno de los notebooks y en main.py mediante Docstrings. Además, cada uno de esos cuatro archivos también contiene comentarios con # cuando se consideró necesario.
+
 # 01_explore_regions.ipynb
 
 ## Primer módulo: generación de los dataframes necesarios.
@@ -7,11 +15,10 @@ df_territories_city=pd.read_csv("~/Escritorio/Hito1/data/raw/datos_sucios_hito1.
 df_territories_city
 ```
 
-1. La línea de pandas que uso para abrir el archivo que contiene los datos. El "~" significa, en sistemas basados en unix, como Linux, la carpeta principal del usuario. pd es el acortamiento universal para pandas cuando lo importo como "import pandas as pd". 
-    - Debo considerar el uso de pathlib, pues la ruta indicada es relativa a mi máquina.
+1. La línea de pandas usadas para abrir el archivo que contiene los datos (estas líneas, sin embargo, fueron reemplazadas por Pathlib en iteraciones posteriores). El "~" significa, en sistemas basados en unix, como Linux, la carpeta principal del usuario. pd es el acortamiento universal para pandas cuando lo importo como "import pandas as pd". 
 
 **Sin embargo:**
-1. Usar ~ no es la práctica correcta, pues se genera una ruta relativa a mi máquina que, muy probablemente, no funcionará en otras. Para esto, puedo usar Pathlib, que me sirve para manejar rutas más robustas y, al mismo tiempo, más flexibles. El código definitivo es el siguiente:
+1. Usar ~ no es la práctica correcta, pues se genera una ruta relativa a mi máquina que, muy probablemente, no funcionará en otras. Para esto, lo correcto sería usar Pathlib, que genera rutas más robustas y, al mismo tiempo, más flexibles. El código definitivo es el siguiente:
 
 ```python
 current_directory= Path.cwd()
@@ -26,15 +33,13 @@ df_territories_city
 ```
 2. El raise detiene la ejecución del código con un mensaje explicativo en caso de que no exista el archivo con el insumo. 
 
-Las bondades de Pathlib sobre lo demás, se explicarán más adelante en la creación del archivo con los datos limpios.
-
 ## Segundo módulo: extracción de valores únicos por columna "Municipios"
 ```python
 city_list=df_territories_city["Municipio"].unique().tolist() #Opción mpas eficiente para el manejo de recursos.
 city_list
 ```
 
-1. Aquí genero una lista a partir del dataframe original. Con los métodos unique() solo obtengo los valores únicos de la columna "Municipio". Esto es útil para que el programa no me pida un municipio todas las veces que aparezca. Con tolist(), convierto todo en lista de una vez.
+1. Aquí se genera una lista a partir del dataframe original. Con los métodos unique() se obtienen los valores únicos de la columna "Municipio". Esto es útil para que el programa no pida un input para un municipio cada que este aparezca. Con tolist(), se convierte en lista.
 
 **Otras opciones usadas y descartadas:**
 ```python
@@ -46,7 +51,7 @@ city_list
     # df_city=df_territories_city[["Municipio"]]
     # df_city
  ```
-Esta última opción la descarté, sin embargo, porque agrega un paso innecesario a esto, pues desde el principio puedo crear la lista directamente.
+**Esta última opción se descartó, sin embargo, porque agrega un paso innecesario, pues desde el principio se puede crear la lista directamente.**
 
 ## Tercer módulo: normalización de acentos
 
@@ -56,7 +61,7 @@ list_accent=df_territories_accent["Región"].unique().tolist()
 list_accent
 ```
 
-1. Los usuarios son expertos en no usar tildes, pero el manejo de datos precisos las requiere. Una tilde puede distinguir dos conceptos distintos entre sí. Por eso genero un dataframe, a partir del original, que contenga únicamente las regiones (que finalmente serán el input del usuario) que tienen tilde. Es importante notar la sintaxis: esto es una máscara booleana. A simple vista, parece redundante, pero tiene un sentido lo que está dentro de corchetes es el filtro que se aplica a lo que esta fuera. Es muy explícito. Uno podría aplicar un filtro con los datos de una Tabla A a una Tabla B. Es raro, pero posible.
+1. El manejo de datos precisos requiere la normalización de los acentos. Una tilde puede distinguir dos conceptos distintos entre sí. Por eso, para estandarizar los acentos, se genera un DataFrame, a partir del original, que contenga únicamente las regiones (que finalmente serán el input del usuario) que tienen tilde. Es importante notar la sintaxis: esto es una máscara booleana. A simple vista, parece redundante, pero tiene un sentido: lo que está dentro de corchetes es el filtro que se aplica a lo que está afuera.
 
 ## Cuarto módulo: funciones para validar el input.
 ### Normalización de acentos
@@ -73,11 +78,10 @@ accent_normalization_dic={accent_normalization(a): a for a in list_accent}
 
 1. Esta es la función para reemplazar los acentos. El parámetro (recordar que el parámetro es lo que se pasa a la función a través del argumento. Es decir, un parámetro es como un placeholder que luego recibirá un valor como argumento cuando se llame a la función), denominado "text", recibirá el argumento más adelante, el cual corresponde al input del usuario.
     - La función "accent_normalization", como su nombre lo indica, sirve para normalizar los acentos mediante la creación de un diccionario, así:
-
 2. Recibe el argumento y le aplica los métodos .lower() para convertir todo a minúsculas y que las entradas no discrepen por cuestiones de mayúsculas.
 3. Seguidamente, aplica el método .strip() para eliminar espacios innecesarios en ambos extremos de la entrada.
 4. Seguidamente, si la entrada tiene una tilde, se removerá con el método .replace() anidado uno tras otro para cada vocal.
-5. La última línea es una comprensión de diccionarios para crear un diccionario donde la llave (lo que está a la izquierda) sea el input sin acentos, sin espacios indeseados y en minúscula; lo que está a la derecha corresponde al valor, el cual se extrae el list_accent, que solo tiene las regiones que originalmente llevan tilde. Es decir, para cada región con tilde estoy creando una versión "desnuda" (sin tilde, sin mayúsculas y sin espacio).
+5. La última línea es una comprensión de diccionarios para crear un diccionario donde la llave sea el input sin acentos, sin espacios indeseados y en minúscula; el valor se extrae del list_accent, que solo tiene las regiones que originalmente llevan tilde. Es decir, para cada región con tilde se crea una versión "desnuda" (sin tilde, sin mayúsculas y sin espacio).
     - El propósito de esto, como lo veremos más adelante, es asegurar que si el usuario ingresa un dato que debería llevar tilde, pero no se la pone, el programa lo corrija por él.
 
 **Opciones usadas y descartadas:**
@@ -85,7 +89,7 @@ accent_normalization_dic={accent_normalization(a): a for a in list_accent}
 #accent_normalization_dic={a.lower().strip().replace("á","a").replace("é","e").replace("í","i").replace("ó","o").replace("ú","u"): a for a in list_accent}
 ```
 
-    El motivo para haber descartado esta línea es porque es repetitiva. Ya la función existe para normalizar los acentos sin tener que repetir todo otra vez en la comprensión de diccionarios.
+**El motivo para haber descartado esta línea es porque es repetitiva. Ya la función existe para normalizar los acentos sin tener que repetir todo otra vez en la comprensión de diccionarios.**
 
 ### Validación de que el input es texto
 ```python
@@ -94,10 +98,9 @@ def is_input_valid(text):
         return False
     return text.replace(" ","").isalpha()
 ```
-
-1. Esta es la segunda función del código. Como su nombre lo indica, su función es corroborar si el texto es una entrada válida, es decir, que sea texto y no contenga carácteres númericos. Debo precisar que la línea ".replace(" ","")" es absolutamente necesaria. .isalpha() rechaza todo lo que no esté catalogado como letra en la base de datos unicode, lo que incluye espacios, emojis, números, signos de puntación, carácteres especiales, etc., pero acepta todo lo que sea una letra en unicode (alfabetos no latinos, tildes, etc.). Por lo mismo, ese replace es necesario, porque necesito eliminar cualquier espacio entre palabras. Por ejemplo, si el usuario ingresa "Puerto Berrio", .isalpha() rechazará la entrada porque tiene un espacio. 
-2. La función recibe un parámetros que se denomina igual al de la función anterior. Es útil porque en realidad es el mismo argumento (el input del usuario) y así me evito manejar mil nombres.
-3. Si la entrada es vacía, entonces devolverá "False", de lo contrario, evaluará la entrada con .isalpha(). Si cumple, devuelve True y el código continúa, sino, devuelve False.
+1. Esta es la segunda función del código. Como su nombre lo indica, su función es corroborar si el texto es una entrada válida, es decir, que sea texto y no contenga caracteres númericos. Debo precisar que la línea ".replace(" ","")" es absolutamente necesaria. .isalpha() rechaza todo lo que no esté catalogado como letra en la base de datos unicode, lo que incluye espacios, emojis, números, signos de puntuación, caracteres especiales, etc., pero acepta todo lo que sea una letra en unicode (alfabetos no latinos, tildes, etc.). Por lo mismo, ese replace es necesario, porque necesito eliminar cualquier espacio entre palabras. Por ejemplo, si el usuario ingresa "Puerto Berrio", .isalpha() rechazará la entrada porque tiene un espacio. 
+2. La función recibe un parámetros que se denomina igual al de la función anterior. Es útil porque en realidad es el mismo argumento (el input del usuario) y así se evita manejar múltiples nombres.
+3. Si la entrada es vacía, entonces devolverá "False", de lo contrario, evaluará la entrada con .isalpha(). Si cumple, devuelve True y el código continúa, si no, devuelve False.
     - Más adelante veremos cómo se integra esta función con el código principal.
 
 ## Quinto módulo: archivo de progreso
@@ -108,12 +111,14 @@ def is_input_valid(text):
 # else:
 #     data_saved=None
 ```
-**Explicación obsoleta de las líneas precedentes:**
-1. Estas líneas son el seguro de progreso. Lo que hago aquí, con la librería os, ya integrada a Python, es tratar de crear un archivo json (el mejor para guardar listas y diccionarios), para lo cual uso la librería correspondiente, que se llame "progress_territories.json".
-2. Verifico si ya existe un archivo llamado de esa manera con el método path.exists().
-3. Si existe, entonces lo abro con "with open" y uso "r" como parámetro de mode. Quiere decir que lo voy a tratar como archivo de solo lectura. "as f", donde f es simplemente el "nombre" que le doy al archivo.
-4. Una vez abierto, porque existe, cargo los datos a la variable "data_saved".
+**Explicación obsoleta de las líneas precedentes (este código se refinó):**
+1. Estas líneas son el seguro de progreso. Aquí se trata, con la librería os, ya integrada a Python, de crear un archivo json (el mejor para guardar listas y diccionarios), para lo cual se usa la librería correspondiente, que se llame "progress_territories.json".
+2. Se verifica si ya existe un archivo llamado de esa manera con el método path.exists().
+3. Si existe, entonces se abre con "with open" y se usa "r" como parámetro de mode. Quiere decir que se tratará como archivo de solo lectura. "as f", donde f es simplemente el "nombre" que se le da al archivo.
+4. Una vez abierto, porque existe, se cargan los datos a la variable "data_saved".
 5. Sino existe, esa misma variable queda vacía.
+
+**Una versión más refinada de estas líneas se encuentra en main.py.**
 
 **Actualización de código:**
 ```python
@@ -180,17 +185,17 @@ print(json.dumps(rpoint, indent=4, ensure_ascii=False))
 6. Si se ingresa, "-", la función devuelve el valor de "city_territories_dic".
 7. Si se ingresa algo diferente, se activa la función para validar si es una entrada válida.
 8. Además, se activa la función para normalizar la entrada. Los valores resultantes de la aplicación de esta función sobre el input se guardan en "territories_key", en oposición a "territories_raw".
-9. Posteriormente, se llama al diccionario que tiene la llave normalizada para cada valor y se le dice: mire, usted va a buscar en las llaves la entrada del usuario (que recordemos que ya está normalizada), si encuentra esa llave, devuélvame el valor (el cual sí tiene las tildes y todo) y si no encuentra el valor, entonces simplemente devuélvame exactamente la entrada del usuario con inicial mayúscula.
-10. Devuelvo información.
-11. Añado la entrada al diccionario "city_territories_dic".
-12. Acabo la función con la devolución de ese diccionario actualizado.
-13. Ahora, llamo la función y aquí es donde se ejecuta el proceso ya descrito.
-14. Creo el archivo json si no existe, o lo sobreescribo si existe.
-15. Para comprobar la validez del archivo, lo llamo.
+9. Posteriormente, se llama al diccionario que tiene la llave normalizada para cada valor con el fin de contrastar. Si en las llaves se encuentra la entrada del usuario (que recordemos que ya está normalizada), se devuelve el valor (el cual sí tiene las tildes y demás) y si no encuentra el valor, entonces simplemente devuélvame exactamente la entrada del usuario con inicial mayúscula.
+10. Se devuelve la información.
+11. Se añade la entrada al diccionario "city_territories_dic".
+12. Termina la función con la devolución de ese diccionario actualizado.
+13. Ahora, se llama la función y aquí es donde se ejecuta el proceso ya descrito.
+14. Se crea el archivo json si no existe, o lo sobreescribe si existe.
+15. Para comprobar la validez del archivo, se llama.
 
 ## Séptimo módulo: creación del archivo definitivo en una nueva ruta
 1. La carpeta /data contiene 3 subcarpetas: 
-    - /raw, la cual debería ser preexistente al código. En este caso, la ruta se construye como objeto con Pathlib, pero el uso de sus flags parents y exist_ok es innecesario. No está dentro del alcance del proyecto organizar un trabajo que es previo al mismo: nombrar el insumo y ubicarlo en su ruta correspondiente, sino trabajo del usuario.
+    - /raw, la cual debería ser preexistente al código. En este caso, la ruta se construye como objeto con Pathlib, pero el uso de sus flags parents y exist_ok es innecesario. No está dentro del alcance del proyecto organizar un trabajo que es previo al mismo: nombrar el insumo y ubicarlo en su ruta correspondiente, si no trabajo del usuario.
     - /interim, en cambio, se maneja enteramente con Pathlib y sus flags, pues es resultado de la ejecución del código.
     - /processed contiene el output final del código: los datos limpios y procesados en un nuevo archivo.
 
@@ -201,8 +206,8 @@ saved_file=saved_output_directory/"datos_limpios_hito1.csv"
 
 df_territories_city.to_csv(saved_file,index=False,encoding="utf-8") #Se guarda la versión corregida: si se quisiera sobreescribr, basta con escribir el mismo nombre.
 ```
-2. En un inicio, este código consistía solo en su última línea y usaba un str de ruta construido con ~. Ya expliqué por qué esto no era la mejor práctica.
-3. Lo que conseguí con Pathlib fue: crear una ruta como objeto más flexible y, al mismo tiempo, más robusta. Pathlib, además, tiene la capacidad de crear directorios inexistentes. Las flags parents=True y exist_ok=True funcionan para eso.
+2. En un inicio, este código consistía solo en su última línea y usaba un str de ruta construido con ~. Ya se explicó por qué esto no era la mejor práctica.
+3. Lo que se consiguió con Pathlib fue crear una ruta como objeto más flexible y, al mismo tiempo, más robusta. Pathlib, además, tiene la capacidad de crear directorios inexistentes. Las flags parents=True y exist_ok=True funcionan para eso.
     - parents puede crear carpetas en cascada si no existen desde la carpeta inicial. Por ejemplo, si "/data" no existiera, parent la crea y luego crearía "/processed".
     - exist_ok, por su parte, no genera error si la carpeta existe, pues si existe ignora el comando de creación y, si no existe, la crea.
 
@@ -220,20 +225,17 @@ if not actual_file.exists():
 df_contacts=pd.read_csv(actual_file)
 ```
 
-1. Con lo aprendido durante el desarrollo de 01_explore_regions.ipynb, se trabajo la ruta del DataFrame inicial con pathlib, y seguí las mismas convenciones ya definidas allí.
-2. ```current_directory=Path.cwd()```genera una ruta como objeto a la que le puedo aplicar los métodos de pathlib.
-3. ```project_root=current_directory.parent```, por ejemplo, .parent me devuelve la ruta inmediatamente anterior a la que obtuve en el primer comando.
-4. ```actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"```, aquí "/" funciona como un concatenador. project_root llega hasta ~/Escritorio/Hito1. Lo que concateno con "/" avanza desde ese primer nivel hasta llegar al archivo CSV.
-5. En ```if not actual_file.exists():```compruebo la existencia del archivo (último nivel) de la línea anterior. Si el archivo no existe, que es la condición del if, raise me devuelve el error concreto y un mensaje de depuración para el usario.
-6. Por último, cargo el DataFrame utilizando el nombre de la variable actual_file. Con esto consigo mayor robustez y flexibilidad en el manejo de ruta. Robustez, porque es menos probable que si alguien corre este código en su máquina reciba un error; flexibilidad, porque la ruta deja de estar tan atada a mi máquina y es más probable que funcione en una diferente.
+1. Se trabajó la ruta del DataFrame inicial con Pathlib según las convenciones definidas en 01_explore_regions.ipynb.
+2. ```current_directory=Path.cwd()```genera una ruta como objeto a la que le puedo aplicar los métodos de Pathlib.
+3. ```project_root=current_directory.parent```, por ejemplo, .parent devuelve la ruta inmediatamente anterior a la que obtuve en el primer comando.
+4. ```actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"```, aquí "/" funciona como un concatenador. project_root llega hasta ~/Escritorio/Hito1. Lo que se concatena con "/" avanza desde ese primer nivel hasta llegar al archivo CSV.
+5. En ```if not actual_file.exists():```se comprueba la existencia del archivo (último nivel) de la línea anterior. Si el archivo no existe, que es la condición del if, raise devuelve el error concreto y un mensaje de depuración para el usario.
+6. Por último, se carga el DataFrame utilizando el nombre de la variable actual_file. Con esto se consigue mayor robustez y flexibilidad en el manejo de ruta. Robustez, porque es menos probable que si alguien corre este código en su máquina reciba un error; flexibilidad, porque la ruta deja de estar tan atada a mi máquina y es más probable que funcione en una diferente.
 
 ## Segundo módulo: comprobación de datos
 
 **Advertencia:**
-Probablemente este módulo desaparecerá en main.py, pues es una comprobación que usé para determinar que el largo del DataFrame coincide con los casos identificados de consignación de los contactos en el DF original.
-
-**Nota:**
-No se eliminará, pues muestra que los casos identificados abarcan la completitud del DataFrame.
+Esta primera parte desaparecerá en main.py, pues es una comprobación que usé para determinar que el largo del DataFrame coincide con los casos identificados de consignación de los contactos en el DF original.
 
 ```python
 nan_count=df_contacts["Contacto"].isna().sum()
@@ -242,13 +244,13 @@ only_number_count=df_contacts["Contacto"].str.replace(" ","").str.replace(".",""
 anythin_else_count=(df_contacts["Contacto"].str.contains(" - | / |Cel|Correo|@", na=False).sum())
 print(only_number_count+nan_count+empty_count+anythin_else_count)
 ```
-1. Sé que el DataFrame original consiste en 135 filas.
-2. Con ```nan_count=df_contacts["Contacto"].isna().sum()```compruebo la cantidad de esos valores por fila y columna específica que son NaN. (Recordar que NaN es especial: es un float que devuelve True, a diferencia de 0.0 que es un float que devuelve False. Por eso, NaN se debe comprobar de esta manera en concreta y no simplemente como si fuera un vacío, pues es su propio tipo de datos.).
-3. Con ```empty_count=(df_contacts["Contacto"].str.strip()=="").sum()```compruebo la cantidad de datos efectivamente vacíos. Debo hacer strip porque una celda puede parecer vacía, pero contener espacios, que no son vacíos.
-4. ```only_number_count=df_contacts["Contacto"].str.replace(" ","").str.replace(".","").str.isdigit().sum()```compruebo la cantidad de valores que son únicamente númericos. Remuevo todos los espacios con replace y preveo que no hayan número separados por puntos para más seguridad. Una vez hecho eso, con isdigit obtengo True/False para cada valor. Como True es 1 y False es 0, sum hace la sumatoria total.
+1. Se sabe que el DataFrame original consiste en 135 filas.
+2. Con ```nan_count=df_contacts["Contacto"].isna().sum()```se comprueba la cantidad de esos valores por fila y columna específica que son NaN. (Recordar que NaN es especial: es un float que devuelve True, a diferencia de 0.0 que es un float que devuelve False. Por eso, NaN se debe comprobar de esta manera en concreto y no simplemente como si fuera un vacío, pues es su propio tipo de datos.).
+3. Con ```empty_count=(df_contacts["Contacto"].str.strip()=="").sum()```se comprueba la cantidad de datos efectivamente vacíos. Se debe hacer .strip() porque una celda puede parecer vacía, pero contener espacios, que no son vacíos.
+4. ```only_number_count=df_contacts["Contacto"].str.replace(" ","").str.replace(".","").str.isdigit().sum()```se comprueba la cantidad de valores que son únicamente númericos. Remuevo todos los espacios con .replace() y se asegura que no haya números separados por puntos para más seguridad. Una vez hecho eso, con .isdigit() se obtiene True/False para cada valor. Como True es 1 y False es 0, .sum() hace la sumatoria total.
 5. ```anythin_else_count=(df_contacts["Contacto"].str.contains(" - | / |Cel|Correo|@", na=False).sum())```si algo no es NaN, vacío o numérico, es porque contiene otras cosas. Los casos identificados fueron: Tel único (se comprueba con la línea anterior), Correo único (cabe dentro de esta línea al no ser NaN, vacío o numérico), Tel/Correo, Tel-Correo. Estos tres últimos casos caben aquí. Si el valor contiene - o / o Cel o Correo o @, se cuenta aquí. na=false para que omita los NaN (primera línea de verificación). El operador pipe "|" funciona como la conjunción "o" en pandas.
-6. El resultado: 135, esto quiere decir que no se me escapó ningun patrón.
-7. El último print es evidencia del funcionamiento de la lógica que sigue. No se elimina.
+6. El resultado: 135, esto quiere decir que no se escapó ningun patrón.
+7. El último print es evidencia del funcionamiento de la lógica que sigue.
 
 ## Tercer módulo: división de los valores mezclados
 ```python
@@ -278,14 +280,14 @@ print(phone_email)
         elif text.startswith("Cel:"):
         return text.replace("Cel: ","").replace("Cel:","").replace(" ","").split("Correo:")
     ```
-    Si el valor de la celda comienza con "Cel:", elimino esa marca en dos casos: "Cel: " y "Cel:", así evito verificar manualmente si alguno de esos casos no existe, pues me adelanto. Elimino el resto de espacios (aunque, ahora que lo pienso, debo invertir el orden para evitar el doble replace de "Cel", es decir, primero eliminar los espacios y así quedaría un solo caso "Cel:" y ningún "Cel: "). **En el código final, se hizo esta corrección.**
+    Si el valor de la celda comienza con "Cel:", se elimina esa marca en dos casos: "Cel: " y "Cel:", así se evita verificar manualmente si alguno de esos casos no existe. Se elimina el resto de espacios (aunque, ahora que lo pienso, debo invertir el orden para evitar el doble replace de "Cel", es decir, primero eliminar los espacios y así quedaría un solo caso "Cel:" y ningún "Cel: "). **En el código final, se hizo esta corrección.**
 
-    Después, divido por "Correo:" (el str por el que divido no se incluye en el output).
+    Después, se divide por "Correo:" (el str por el que se divide no se incluye en el output).
 4. ```python
     elif text.startswith("Correo:"):
         return text.replace("Correo:","").replace("Correo: ","").replace(" ","").split("Cel:")
     ```
-    Mismo comentario anterior, pero con el orden inverso: remplazo "Correo" y divido por "Cel".
+    Mismo comentario anterior, pero con el orden inverso: se remplaza "Correo" y se divide por "Cel".
 5. ```python
     elif "/" in text:
         return text.replace(" ","").split("/")
@@ -297,11 +299,11 @@ print(phone_email)
     else:
         return text.split()
     ```
-    Esta línea es especial: es muy importante mantener la consistencia del output para que no haya posibles errores al trabajar sobre él. La naturaleza de .split() siempre devuelve una lista, por eso tengo que hacer esto, para que cualquier otro caso no me devuelva un valor que no sea lista.
+    Esta línea es especial: es muy importante mantener la consistencia del output para que no haya posibles errores al trabajar sobre él. La naturaleza de .split() siempre devuelve una lista, por eso tengo que hacer esto, para que cualquier otro caso no devuelva un valor que no sea lista.
 7. ```python
     phone_email=df_contacts["Contacto"].apply(split_phone_email).tolist()
     ```
-    Ahora, aplico esta función a la columna "Contacto" del DataFrame. Como son valores tipo serie, debo usar apply. Con tolist() convierto el output en una lista. El .tolist() es importante porque sin él, obtendría una serie. Las series son útiles para operaciones vectorizables, pero en este caso, necesito iterar valor por valor para definir si es teléfono o email según las condiciones impuestas y el problema es que los valores de la lista no son uniformes (varían en longitud, pues "row" puede contener uno o dos elementos según el caso).
+    Ahora, se aplica esta función a la columna "Contacto" del DataFrame. Como son valores tipo serie, se debe usar apply. Con .tolist() se convierte el output en una lista. El .tolist() es importante porque sin él, se obtendría una serie. Las series son útiles para operaciones vectorizables, pero en este caso, necesito iterar valor por valor para definir si es teléfono o email según las condiciones impuestas y el problema es que los valores de la lista no son uniformes (varían en longitud, pues "row" puede contener uno o dos elementos según el caso).
 8. El último print era de depuración, se eliminará.
 
 ## Cuarto módulo: definición concreta de lo que es teléfono y de lo que es correo
@@ -345,17 +347,16 @@ for row in phone_email:
     results.append(is_phone_email(row))
 print (results)
 ```
-Esto fue de lo que más me costó entender. La lógica es la siguiente:
-1. En el último ciclo for itero cada elemento tipo lista de la "macrolista" phone_email generada en la función anterior.
-2. Genero una nueva lista con los valores separados por correo y por teléfono. Eso es ```results.append(is_phone_email(row))```
+1. En el último ciclo for se itera cada elemento tipo lista de la "macrolista" phone_email generada en la función anterior.
+2. Se genera una nueva lista con los valores separados por correo y por teléfono. Eso es ```results.append(is_phone_email(row))```
 3. Ese ```print(results)```es de depuración, se eliminará.
 4. La pregunta es: ¿cómo ese ciclo for utiliza la función? Veamos.
     - La función lo que hace es tomar cada elemento y definir su longitud con len(row).
     - Si la longitud es ==1, entonces hay 3 posibilidad:
         - El contenido es "Sin dato", solo un correo o solo un teléfono.
-        - Luego verifico caso por caso: si es numérico, entonces es teléfono.
+        - Luego se verifica caso por caso: si es numérico, entonces es teléfono.
         - Si no es numérico y contiene "@", entonces es correo.
-        - Si no es numérico y no contiene "@" (a algún usuario se le puede pasar), entonces verifico si es alfabético, en cuyo caso es correo. Traté de introducir las cosas más comunes usadas en los correo: _,-,. (pero ahora que lo veo, también debo filtrar números, pues muchos correos se crean con números).
+        - Si no es numérico y no contiene "@" (a algún usuario se le puede pasar), entonces verifico si es alfabético, en cuyo caso es correo. Se trató de introducir las cosas más comunes usadas en los correos: _,-,.. (Sin embargo, también se debería filtrar por números, pues muchos correos se crean con números). Para ello, el código final usó .isalnum().
         - Si no es nada de lo anterior, entonces es "Sin dato".
     - Si la longitud es >1, entonces hay 3 posibilidad:
         - Si la posición inicial de la dupla dígito, entonces la segunda es correo.
@@ -395,11 +396,11 @@ if "Contacto" in df_contacts.columns:
 
 df_contacts
 ```
-1. Utilizo comprensión de listas para generar dos listas con los valores ya clasificados.
+1. Se utiliza comprensión de listas para generar dos listas con los valores ya clasificados.
 2. Esta comprensión desempaqueta las tuplas de una vez en su orden respectivo, por eso no es necesario usar los índices que usé en la función anterior. El resultado de la función anterior ya genera un orden concreto: primero teléfono y luego correo.
 3. Si la columna "Teléfono" no existe en el DataFrame, se crea en esa posición concreta con loc. Esta forma de crear columnas es inplace por defecto.
 4. Lo mismo para "Correo".
-5. Si la columna "Contacto" todavía existe, se elimina. Este método, por el contrario, no es inplace por defecto. Por tanto, se puede usar con seguridad para obviar valores que no quiero ver por cualquier motivo sin afectar el DataFrame original.
+5. Si la columna "Contacto" todavía existe, se elimina. Este método, por el contrario, no es inplace por defecto. Por tanto, se puede usar con seguridad para obviar valores que no se desean ver por cualquier motivo sin afectar el DataFrame original.
 
 # 03_explore_status.ipynb
 
@@ -415,9 +416,9 @@ if not actual_file.exists():
 df_status=pd.read_csv(actual_file)
 ```
 **Conocimientos importantes que salieron de este primer módulo**
-1. ```df_status["Observaciones"]``` Funciona para visualizar el contenido de una sola columna, pero devuelve una Serie no renderizada en HTML para verla en estilo DataFrame. Sucede porque le estoy dando un valor tipo str, en cuyo caso "desenvuelve" los valores de la columna y me entrega una Serie.
-2. ```df_status[df_status["Observaciones"]]```No funciona si pretendo utilizarla para visualizar los valores de una sola columna, devuelve KeyError. Esta sintaxis filtra y se interpreta como los valores de la columna observaciones aplicados al DataFrame original. Esos valores son una Serie, como el caso de arriba y, al ser desenvueltos, se interpretan como nombres de columnas. Al no existir esas columnas, genera error. Esta sintaxis sirve para filtrar la columna según el contenido de sus valores, pues funciona como una máscara boleana. Es decir, si aplico un filtro a esos valores, serán True/False y solo veré en el output aquellos que sea True.
-3. ```df_status[["Observaciones"]]```Funciona también para visualizar los datos de una sola columna y se ve en formato DataFrame, estilo HTML. En este caso, estoy pasando una lista, por eso los corchetes dobles. No es que la lista se llame "Observaciones", sino que le estoy pidiendo que me muestre los elementos que contiene esa lista.
+1. ```df_status["Observaciones"]``` Funciona para visualizar el contenido de una sola columna, pero devuelve una Serie no renderizada en HTML para verla en estilo DataFrame. Sucede porque se le da un valor tipo str, en cuyo caso "desenvuelve" los valores de la columna y entrega una Serie.
+2. ```df_status[df_status["Observaciones"]]```No funciona si pretendo utilizarla para visualizar los valores de una sola columna, devuelve KeyError. Esta sintaxis filtra y se interpreta como los valores de la columna aplicados al DataFrame original. Esos valores son una Serie, como el caso de arriba y, al ser desenvueltos, se interpretan como nombres de columnas. Al no existir esas columnas, genera error. Esta sintaxis sirve para filtrar la columna según el contenido de sus valores, pues funciona como una máscara booleana. Es decir, si aplico un filtro a esos valores, serán True/False y solo veré en el output aquellos que sea True.
+3. ```df_status[["Observaciones"]]```Funciona también para visualizar los datos de una sola columna y se ve en formato DataFrame, estilo HTML. En este caso, se pasa una lista, por eso los corchetes dobles. No es que la lista se llame "Observaciones", sino que se le pide que muestre los elementos que contiene esa lista.
 
 ## Segundo módulo: patrones identificados en el DataFrame para la columna observaciones
 ### Primera definición de criterios:
@@ -467,7 +468,7 @@ No es un proyecto de análisis semántico, sino de análisis de datos. No tengo 
 Esta muestra contiene casos estandarizados. Validar casos como: "los datos no fueron recogidos en su totalidad" o "no se pudo realizar la visita", etc., que no se puedan definir con regex, requerirían otras herramientas de análisis semántico que aun no conozco.
 
 **Exploración de conceptos**
-*Esto no refleja el código final. Se trata de una fase exploratoria que se deja consignada porque de aquí se obtuve un gran aprendizaje.*
+*Esto no refleja el código final. Se trata de una fase exploratoria que se deja consignada porque de aquí se obtuvo un gran aprendizaje.*
 
 ```python
 #Aproximaciones:
@@ -488,25 +489,25 @@ Todo esto merece una explicación detallada:
     - ¿Qué me devuelve?: un pandas.DataFrame
     - ¿Conserva el índice? Sí
     - Si lo convierto a lista, ¿conservaría el índice?: No
-    - ¿Qué significa que me devuelva un pandas.DataFrame?: que obtengo un output en 2D, no una máscara boleana.
+    - ¿Qué significa que me devuelva un pandas.DataFrame?: que obtengo un output en 2D, no una máscara booleana.
 2. Segunda línea de código (la no comentada):
     - ¿Qué me devuelve?: un pandas.Series
     - ¿Conserva el índice?: sí
-    - ¿Qué significa que me devuelva un pandas.Series?: las series también funcionan como máscaras boleanas cuando son de tipo bool **(ojo: no cualquier Series funciona como filtro, algunas son solo datos)**. Es decir, esa máscara se la puedo aplicar a un DataFrame. Ejemplo:
+    - ¿Qué significa que me devuelva un pandas.Series?: las series también funcionan como máscaras booleanas cuando son de tipo bool **(ojo: no cualquier Series funciona como filtro, algunas son solo datos)**. Es decir, esa máscara se la puedo aplicar a un DataFrame. Ejemplo:
         ```python
         df_status.loc[status_red]
         ```
-    - ¿Qué me devuelve?: un pandas.DataFrame con la máscara boleana aplicada.
+    - ¿Qué me devuelve?: un pandas.DataFrame con la máscara booleana aplicada.
 3. ¿Cómo se relacionan el punto uno y dos?
     - No puedo aplicar un pandas.DataFrame a un pandas.DataFrame con .loc por cuestión de dimensiones: .loc espera algo en una dimensión para responder sí/no a algo concreto. Los DataFrame son bidimensionales, por eso el error es "Cannot index with multidimensional key".
     - df_status ya es un pandas.DataFrame y el resultado de la primera línea de código es del mismo tipo.
     - Por eso, no puedo hacer esto mismo con ```df_status.loc[status_red]```si status_red es un pandas.DataFrame, arroja error.
 
-En conclusión: la sintaxis de las líneas comentadas es la máscara boleana ya aplicada al DataFrame original para generar un **nuevo** DataFrame filtrado. El resultado de la sintaxis no comentada no genera un nuevo DataFrame, sino que genera una **serie** que me puede servir para filtar un DataFrame.
+En conclusión: la sintaxis de las líneas comentadas es la máscara booleana ya aplicada al DataFrame original para generar un **nuevo** DataFrame filtrado. El resultado de la sintaxis no comentada no genera un nuevo DataFrame, sino que genera una **serie** que me puede servir para filtar un DataFrame.
 
 Es importante tener en cuenta que .loc es **inplace** por defecto cuando se usa como asignador .loc[máscara,"Estado"]=x, si se usa como lector .loc[máscara], el DataFrame original queda intacto.
 
-**Código definitivo: regex y máscara boleana**
+**Código definitivo: regex y máscara booleana**
 
 ```Python
 fil_red=df_status["Observaciones"].str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False)
@@ -516,7 +517,6 @@ fil_green=df_status["Observaciones"].str.contains(r"[ée]xito[s]?[oa]?|sin noved
 
 print(fil_red.sum()+fil_orange.sum()+fil_yellow.sum()+fil_green.sum())
 ```
-*Estas líneas son la versión con regex de las que se usaron y fueron descartadas (ver más arriba).*
 
 1. fil_red incluye los strings literales "urgente" y "riesgo". Para los demás casos, se usa regex, así:
     - ```fall[ao]s?\b\s*estructural[e]?s?\b```significa: la coincidencia literal "fall" seguida de "a" u "o", seguida de una "s" opcional, fin de palabra y cualquier cantidad de espacios antes de la coincidencia literal "estructural" seguida de una "e" opcional, seguida de una "s" opcional, fin de palabra. Eso permite casos como "falla estructural", "fallas estructurales", "fallo estructural", "fallos estructurales", "fallo estructurales", "falla estructurales", "falla estructurals", etc.
@@ -539,8 +539,8 @@ df_status.loc[fil_yellow,"Estado"]="Amarillo"
 df_status.loc[fil_green,"Estado"]="Verde"
 df_status
 ```
-1. La primera línea es profiláctica: si la columna no existe, la crea y asigna todos sus valores a NaN. Si ya existe, ajusta todos sus valores a NaN. ¿Por qué? Porque si hay un cambio en el código anterior, puede que algunos casos entren y otros salgan de la máscara boleana, es decir, que cambien de estado: lo que era True se haga False y viceversa. .loc solo trabaja sobre lo True y lo False permanece igual. Entonces, todo lo que se volvió False y antes era True, se conservaría tal cual. Es decir, quedarían filtros aplicados de iteraciones pasadas. Si cada vez que ejecuto el código vuelvo todo NaN, omito ese problema.
-2. Aplico la máscara boleana al DataFrame por cada estado. Al final, obtengo un solo DataFrame con las máscaras aplicadas.
+1. La primera línea es profiláctica: si la columna no existe, la crea y asigna todos sus valores a NaN. Si ya existe, ajusta todos sus valores a NaN. ¿Por qué? Porque si hay un cambio en el código anterior, puede que algunos casos entren y otros salgan de la máscara booleana, es decir, que cambien de estado: lo que era True se haga False y viceversa. .loc solo trabaja sobre lo True y lo False permanece igual. Entonces, todo lo que se volvió False y antes era True, se conservaría tal cual. Es decir, quedarían filtros aplicados de iteraciones pasadas. Si cada vez que ejecuto el código vuelvo todo NaN, omito ese problema.
+2. Aplico la máscara booleana al DataFrame por cada estado. Al final, obtengo un solo DataFrame con las máscaras aplicadas.
 
 ## Cuarto módulo: reordenamiento de columnas
 
@@ -550,7 +550,7 @@ new_order=first_cols+["Observaciones","Estado"]
 df_status=df_status[new_order]
 df_status
 ```
-1. Genero una lista que contiene las columnas que no son ni "Observaciones" ni "Estado" (justo las dos columnas que quiero dejar para el final del DataFrame).
+1. Genera una lista que contiene las columnas que no son ni "Observaciones" ni "Estado" (justo las dos columnas que se quieren dejar para el final del DataFrame).
 2. Genera una nueva lista con el orden deseado: primero las columnas que no son "Observaciones" ni "Estado" y después estas dos.
 3. Para que el cambio sea efectivo, debo hacer que el DataFrame original sea igual al DataFrame original con el orden cambiado. 
 
@@ -580,12 +580,12 @@ names_data=df_namedates["Nombre_Informante"]!="Sin dato"
 df_namedates.loc[names_data,"Nombre_Informante"]=df_namedates.loc[names_data,"Nombre_Informante"].str.title()
 df_namedates
 ```
-1. names_nodata es una máscara boleana que luego se aplica a df_namesdata para que, todo lo que sea True en esa máscara, pase a ser "Sin dato". Por eso, la máscara incluye valores NaN, o valores que después de eliminar los espacios quedan vacíos, o valores "N/A" o "No registra".
-    - ```(df_namedates["Nombre_Informante"].str.replace(" ","")=="")```esta condición de la línea es particularmente interesante: nótese que todo lo demás devuelve un boleano, pero replace no devuelve boleano, sino str. Por eso debo incluir =="", lo que lo convierte en esto: ¿después de eliminar los espacios, lo que queda es igual a vacío? Esa respuesta si es boleana.
-2. Aplico esa máscara boleana a df_namedates y, como dije, todo lo que es True ahora es "Sin dato".
-3. Luego defino otra máscara names_data, la cual consiste en todos los valores que sean diferentes a "Sin dato".
-4. Esa máscara la aplico a df_namedates para que a todo lo que sea diferente a "Sin dato" se le aplique .title. De esa manera, no queda "Sin Dato" y los nombres quedan con sus respectivas mayúsculas.
-5. La línea df_namedates solo la usé para ver el resultado. No quedará en main.py
+1. names_nodata es una máscara booleana que luego se aplica a df_namedates para que, todo lo que sea True en esa máscara, pase a ser "Sin dato". Por eso, la máscara incluye valores NaN, o valores que después de eliminar los espacios quedan vacíos, o valores "N/A" o "No registra".
+    - ```(df_namedates["Nombre_Informante"].str.replace(" ","")=="")```esta condición de la línea es particularmente interesante: nótese que todo lo demás devuelve un booleano, pero replace no devuelve booleano, sino str. Por eso debo incluir =="", lo que lo convierte en esto: ¿después de eliminar los espacios, lo que queda es igual a vacío? Esa respuesta sí es booleana.
+2. Se aplica esa máscara booleana a df_namedates y todo lo que es True ahora es "Sin dato".
+3. Luego se define otra máscara names_data, la cual consiste en todos los valores que sean diferentes a "Sin dato".
+4. Esa máscara se aplica a df_namedates para que a todo lo que sea diferente a "Sin dato" se le aplique .title. De esa manera, no queda "Sin Dato" y los nombres quedan con sus respectivas mayúsculas.
+5. La línea df_namedates se usó para ver el resultado. No quedará en main.py
 
 **Código usado y descartado:**
 
@@ -601,7 +601,7 @@ df_namedates
 # print(names_lower)
 ```
 **¿Por qué se descartó**
-Porque el código anterior, si bien funciona (no está terminado, lo abandoné antes de terminarlo) es una forma complicada de hacer lo que deseo: filtar NaN y vacíos y pasar todo a minúsculas. Es una operación vectorizable que puedo realizar en el DataFrame directamente a través de máscaras boleanas.
+Porque el código anterior, si bien funciona (no está terminado, lo abandoné antes de terminarlo) es una forma complicada de hacer lo que deseo: filtar NaN y vacíos y pasar todo a minúsculas. Es una operación vectorizable que puedo realizar en el DataFrame directamente a través de máscaras booleanas.
 
 ## Tercer módulo: normalizar fechas (patrón de letras a números)
 
@@ -619,8 +619,8 @@ def numeric_month(match):
 df_namedates["Fecha_Registro"]=df_namedates["Fecha_Registro"].str.replace(r"(?P<month>\w{3})\s*(?P<day>\d{2}),\s*(?P<year>\d{2,4})",numeric_month,regex=True)
 df_namedates[["Fecha_Registro"]]
 ```
-1. Defino un diccionario que me permitirá mapear los meses. En este diccionario, la llave es el mes y el valor es su número correspondiente.
-2. Defino una función recibe como argumento el match que extraigo con regex, así:
+1. Se define un diccionario que permitirá mapear los meses. En este diccionario, la llave es el mes y el valor es su número correspondiente.
+2. Se define una función que recibe como argumento el match que se extrae con regex, así:
     - ```df_namedates["Fecha_Registro"]=df_namedates["Fecha_Registro"].str.replace(r"(?P<month>\w{3})\s*(?P<day>\d{2}),\s*(?P<year>\d{2,4})",numeric_month,regex=True)```esta línea dice: encuentre 3 letras consecutivas y agrúpelas bajo el nombre "month", seguidas de cualquier cantidad de espacios, seguidos de dos dígitos consecutivos agrupados bajo el nombre "day", seguidos de coma y cualquier cantidad de espacios, seguidos de 2 o 4 dígitos consecutivos agrupados bajo el nombre "year".
     - Ese patrón, lo va a reemplazar (aunque lo correcto sería decir "reordenar en este caso) según lo que devuelva la función.
 3. La función le asigna a una variable text_month el nombre del mes capturado con regex. Es decir, las 3 letras consecutivas.
@@ -649,5 +649,45 @@ df_namedates
 
 No es necesaria una explicación, pues este módulo funciona de manera similar al anterior.
 
-# Oportunidades de mejora
-1. ¿Qué pasa si el usuario a una región le pone una tilde que no lleva?
+# main.py
+
+Se consolida cada notebook en un único pipeline.
+
+Se utilizó la siguiente estructura:
+1. imports
+2. Constantes/configuración
+3. funciones
+4. if __name__=="__main__"
+
+Cada una de las partes que componen el main.py están comentadas debidamente en los notebooks, por lo que no es necesario repetirlas aquí. Sin embargo, sí vale la pena hacer algunas aclaraciones.
+
+## bloque if __name__=="__main__"
+
+Todas las funciones quedaron por fuera de este bloque. En este bloque solo se encuentra aquello que genera resultados tangibles dentro del código, como es la ejecución de cada una de esas funciones. Cuando el código se ejecuta desde su propio archivo __name__ y "__main__" coinciden y, por tanto, todo se ejecuta. Sin embargo, cuando el código se ejecuta desde una fuente externa __name__ es igual al propio nombre del archivo, por tanto lo que está dentro de este bloque no se ejecutará. Esta división es útil para, por ejemplo, importar funciones de un archivo a otro sin que se ejecute completo, sino solo lo que está por fuera de este bloque, como son las funciones.
+
+### Apertura del DataFrame:
+
+    ```python
+    project_root=Path(__file__).resolve().parent
+    actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
+    if not actual_file.exists():
+        raise FileNotFoundError("Falta el insumo de trabajo. Debe nombrarlo como \"datos_sucios_hito1.csv\" y guardarlo en data/raw/")
+    df=pd.read_csv(actual_file)
+    ```
+1. A diferencia de los notebooks, aquí se usa __file__ para llegar a la ruta exacta desde la cual se ejecuta main.py. Se usó porque main.py está directamente dentro de Hito1 y no en alguna subcarpeta. Si se moviera, .parent fallaría.
+
+### Guardado del resultado:
+
+```python
+    saved_output_directory=project_root/"data"/"processed"
+    saved_output_directory.mkdir(parents=True, exist_ok=True)
+    saved_file=saved_output_directory/"datos_limpios_hito1.csv"
+
+    df.to_csv(saved_file,index=False,encoding="utf-8")
+```
+Estas líneas son la versión refinada de las que se encontraban en 01_explore_regions.ipynb. Guardan el DataFrame procesado en una carpeta exclusiva para él.
+
+### Otras consideraciones:
+
+1. Cada uno de los notebooks tenía un nombre para el DataFrame original. En main.py, no obstante, se llamó simplemente df.
+2. Dentro de .gitignore se excluyó la carpeta completa donde se guarda el DataFrame procesado, es decir, processed/, pues es resultado de la ejecución del código y, por tanto, no es indispensable para su funcionamiento.
