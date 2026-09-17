@@ -1,6 +1,12 @@
 # Hito 1 — Normalizador de Municipios y Contactos
 
+> English summary: A data-cleaning pipeline that normalizes a 135-record dataset (accents, casing, date formats, contact info) and assigns a priority level to each observation based on its content. Built as the first step of a self-directed transition from philology into data analysis and NLP. (The rest of this document is in Spanish.)
+
 Pipeline de análisis de datos para la limpieza y normalización (acentos, mayúsculas, formato de fecha, contactos) de un dataset de 135 registros que incluye regiones, contactos, nivel de prioridad, fechas y nombres.
+
+## Relevancia
+
+Las observaciones de este dataset describen situaciones de campo que pueden implicar afectaciones a la vida, la salud o los derechos de población vulnerable. Por eso el pipeline no se limita a limpiar y normalizar los datos: también asigna un nivel de prioridad (rojo, naranja, amarillo, verde) según el contenido de cada observación, de manera que los casos más urgentes puedan identificarse de inmediato en vez de perderse entre 135 filas sin clasificar.
 
 ## Contexto
 
