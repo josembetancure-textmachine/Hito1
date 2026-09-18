@@ -68,4 +68,4 @@ Hito1/
 
 ## Autoría
 
-Para conocer el proceso de desarrollo completo y la postura sobre el uso de IA en este proyecto, ver [NOTAS.md](NOTAS.md)
+Para conocer el proceso de desarrollo completo y la postura sobre el uso de IA en este proyecto, ver [NOTAS_HITO1.md](NOTAS_HITO1.md)
