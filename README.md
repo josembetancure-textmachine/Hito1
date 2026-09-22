@@ -8,6 +8,8 @@ Pipeline de análisis de datos para la limpieza y normalización (acentos, mayú
 
 Las observaciones de este dataset describen situaciones de campo que pueden implicar afectaciones a la vida, la salud o los derechos de población vulnerable. Por eso el pipeline no se limita a limpiar y normalizar los datos: también asigna un nivel de prioridad (rojo, naranja, amarillo, verde) según el contenido de cada observación, de manera que los casos más urgentes puedan identificarse de inmediato en vez de perderse entre 135 filas sin clasificar.
 
+**Nota sobre los datos:** este dataset es sintético, es decor, fue diseñado para imitar un reporte de campo (acentos inconsistentes, fechas ambiguas, datos faltantes, redacción variable). No proviene de observaciones reales de docentes.
+
 ## Contexto
 
 Este proyecto se realiza como introducción a la programación orientada al análisis de datos y hace parte de un plan de transición al sector tecnológico que desemboca en el procesamiento del lenguaje natural y, por tanto, incluye SQL, pandas, PyTorch, etc.
