@@ -7,11 +7,8 @@ from pathlib import Path
 
 #Constantes/configuración
 
-months_map = {
-    "Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04",
-    "May": "05", "Jun": "06", "Jul": "07", "Aug": "08",
-    "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12"
-}
+date_formats = ["%d/%m/%y", "%d-%m-%y", "%Y-%m-%d", "%Y/%m/%d", "%b %d, %Y"]
+months_spa_to_eng = {r"\bEne\b": "Jan", r"\bAbr\b": "Apr", r"\bAgo\b": "Aug", r"\bDic\b": "Dec"}
 
 #Funciones
 
@@ -175,37 +172,19 @@ def is_phone_email(row):
 
     return phone, email
 
-def numeric_month(match):
-    '''
-    Convierte el mes textual a su número correspondiente y reorganiza los elementos de la fecha para que coincida con el formato día/mes/año
+def normalized_dates(dates):
+    translated_months=dates.replace(months_spa_to_eng, regex=True)
+    parsed=pd.Series(pd.NaT, index=dates.index)
 
-    Args:
-        match (re.Match): objeto de coincidencia entregado automáticamente por .str.replace(), del cual se extraen los grupos nombrados capturados por el patrón.
-    
-    Returns:
-        str: cadena de texto con la fecha normalizada para que coincida con el formato día/mes/año.
-    '''
-    text_month=match.group("month")
-    return f"{match.group("day")}/{months_map[text_month]}/{match.group("year")}"
+    for dates_format in date_formats:
+        attempt=pd.to_datetime(translated_months, format=dates_format, errors="coerce")
+        parsed=parsed.fillna(attempt)
 
-def month_year_date(match):
-    '''
-    Reorganiza los elementos de la fecha para que coincidan con el formato día/mes/año
+    parsed=parsed.dt.strftime("%d/%m/%Y")
+    parsed=parsed.fillna("Sin dato")
 
-    Args:
-        match (re.Match): objeto de coincidencia entregado automáticamente por .str.replace(), del cual se extraen los grupos nombrados capturados por el patrón.
+    return parsed
     
-    Returns:
-        str: cadena de texto con la fecha normalizada para que coincida con el formato día/mes/año
-    
-    Notes:
-        Para resolver los casos ambiguos entre día/mes (o incluso año cuando solo tiene dos dígitos) en posición inicial, la función asume que el primer elemento siempre es un 
-        día, pues el formato común en el contexto de creación y uso de este DataFrame es día/mes/año.
-    '''
-    if len(match.group("a"))==2: 
-        return f"{match.group("a")}/{match.group("b")}/{match.group("c")}"
-    else:
-        return f"{match.group("c")}/{match.group("b")}/{match.group("a")}"
 
 #Bloque if __name__=="__main__"
 
@@ -288,9 +267,7 @@ if __name__=="__main__":
     names_data=df["Nombre_Informante"]!="Sin dato"
     df.loc[names_data,"Nombre_Informante"]=df.loc[names_data,"Nombre_Informante"].str.title()
 
-    df["Fecha_Registro"]=df["Fecha_Registro"].str.replace(r"(?P<month>\w{3})\s*(?P<day>\d{2}),\s*(?P<year>\d{2,4})",numeric_month,regex=True)
-
-    df["Fecha_Registro"]=df["Fecha_Registro"].str.replace(r"(?P<a>\d{2,4})[-/](?P<b>\d{2})[-/](?P<c>\d{2,4})",month_year_date,regex=True)
+    df["Fecha_Registro"]=normalized_dates(df["Fecha_Registro"])
 
     saved_output_directory=project_root/"data"/"processed"
     saved_output_directory.mkdir(parents=True, exist_ok=True)
