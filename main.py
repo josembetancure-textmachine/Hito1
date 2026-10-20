@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import numpy as np
 import os
 import re
 from pathlib import Path
@@ -262,17 +263,20 @@ if __name__=="__main__":
     if "Contacto" in df.columns:
         df.drop(columns=["Contacto"],inplace=True)
 
-    fil_red=df["Observaciones"].str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False) #[e]?s? en vez de agrupar (es)?: tolera errores de tipeo de una letra (ej. "estructurale"), decisión deliberada
-    fil_orange=df["Observaciones"].str.contains(r"prioritario|incomplet[ao]?s?\b|recolec\w*\b.*parcial\w*\b",case=False) #.* (no \s*) permite palabras intermedias, ej. "recolectado de forma parcial", no solo espacios
-    fil_yellow=df["Observaciones"].str.contains("important", case=False) #Se verificó que "important" (sin la "e" final) no genera falsos positivos con "importación"/"importador", a diferencia de "import". No fue el motivo original (fue corrección de un typo), pero es una propiedad útil verificada.
-    fil_green=df["Observaciones"].str.contains(r"[ée]xito[s]?[oa]?|sin novedad|normal", case=False) #[ée] tolera tilde omitida en "éxito"
+    observaciones = df["Observaciones"]
 
-    df["Estado"] = pd.NA
+    condiciones=[observaciones.str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False), #[e]?s? en vez de agrupar (es)?: tolera errores de tipeo de una letra (ej. "estructurale"), decisión deliberada
+                 observaciones.str.contains(r"prioritario|incomplet[ao]?s?\b|recolec\w*\b.*parcial\w*\b",case=False), #.* (no \s*) permite palabras intermedias, ej. "recolectado de forma parcial", no solo espacios
+                 observaciones.str.contains(r"important", case=False), #Se verificó que "important" (sin la "e" final) no genera falsos positivos con "importación"/"importador", a diferencia de "import". No fue el motivo original (fue corrección de un typo), pero es una propiedad útil verificada.
+                 observaciones.str.contains(r"[ée]xito[s]?[oa]?|sin novedad|\bnormal\b", case=False), #[ée] tolera tilde omitida en "éxito". Uso de \b para "normal", de manera tal que no se cuele "anormal".
+                 ]
 
-    df.loc[fil_red,"Estado"]="Rojo"
-    df.loc[fil_orange,"Estado"]="Naranja"
-    df.loc[fil_yellow,"Estado"]="Amarillo"
-    df.loc[fil_green,"Estado"]="Verde"
+    etiquetas=["Rojo",
+               "Naranja",
+               "Amarillo",
+               "Verde"]
+
+    df["Estado"]=np.select(condiciones, etiquetas, default="Sin clasificar")
 
     first_cols=[col for col in df.columns if col not in ["Observaciones","Estado"]]
     new_order=first_cols+["Observaciones","Estado"]
