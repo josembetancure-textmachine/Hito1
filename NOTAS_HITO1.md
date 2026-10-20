@@ -691,3 +691,54 @@ Estas líneas son la versión refinada de las que se encontraban en 01_explore_r
 
 1. Cada uno de los notebooks tenía un nombre para el DataFrame original. En main.py, no obstante, se llamó simplemente df.
 2. Dentro de .gitignore se excluyó la carpeta completa donde se guarda el DataFrame procesado, es decir, processed/, pues es resultado de la ejecución del código y, por tanto, no es indispensable para su funcionamiento.
+
+# Auditoría de código
+
+Durante septiembre y octubre de 2026, corrí varios agentes de IA (Claude) para que auditaran el proyecto como si fueran auditores externos e independientes. Los hallazgos fueron los siguientes:
+
+| Hallazgo | Qué falla | Gravedad |
+|---|---|---|
+| H-01 | Las cuatro reglas de estado se asignan en el orden Rojo → Naranja → Amarillo → Verde, y cada asignación reemplaza la anterior. Si una observación cumple dos reglas, gana la menos grave: "Urgente… sin novedad" termina en Verde. | Alto |
+| H-02 | Las fechas no quedan en un formato uniforme: 51 de 135 salen con año de dos cifras. Los días y meses de una cifra (`8/2/26`, `Feb 8, 2026`) pasan sin transformar, y un mes en español (`Abr`) lanza `KeyError` y detiene el programa. | Alto |
+| H-03 | La separación de teléfono y correo depende del carácter separador. Un correo con guion (`puerto-claver@dominio.com`) se parte y termina en la columna equivocada o incompleto, y el tercer fragmento se descarta sin aviso. | Medio |
+| H-04 | Fallos silenciosos: (a) una observación que no cumple ninguna regla queda con `Estado` nulo; (b) si se sale de la captura con `-`, los municipios sin región quedan nulos y el programa termina sin avisar; (c) `.str.contains()` no usa `na=False`, lo que falla con pandas 2. | Medio |
+| H-05 | No hay pruebas automatizadas ni integración continua. La validación se hizo solo mirando la salida y comprobando que los conteos sumaban 135. | Alto |
+| H-06 | Las funciones de los notebooks son copia literal de las de `main.py`. Al corregir el script, los notebooks seguirán mostrando la versión defectuosa sin ninguna señal de que quedaron desactualizados. | Medio |
+| H-07 | El notebook 01 escribe en `data/processed/datos_limpios_hito1.csv`, la misma ruta que el pipeline. Si se ejecuta después de `main.py`, reemplaza el entregable completo por una versión que solo tiene las regiones normalizadas. | Medio |
+| H-08 | Los notebooks calculan la raíz del proyecto con `Path.cwd().parent`, que supone que el kernel arranca en `notebooks/`. Si arranca en otra carpeta, el programa dice que falta el insumo aunque el archivo existe. | Bajo |
+| H-09 | Toda la lógica vive en el bloque `__main__` y su corrección depende del orden en que están escritas las líneas. `city_territories` lee `accent_normalization_dic` como variable global, y la lista de municipios se calcula antes del `strip`. Esto impide probar cada paso por separado. | Alto |
+| H-10 | Quedan restos de la fase de exploración: `import os` sin uso, guardas `if "Teléfono" not in df.columns` que siempre se cumplen, una segunda lectura del JSON que ya está en memoria y posiciones de columna fijas (`loc=4`, `loc=5`). | Bajo |
+| H-11 | El código se desvía de PEP 8 (espaciado), tiene nombres poco claros (`rpoint`, `fil_red`), comentarios de hasta 400 caracteres al final de las líneas, y f-strings con comillas dobles anidadas que exigen Python 3.12 sin necesidad. El cambio de idioma que proponía el auditor externo no aplica en P1. | Bajo |
+| H-12 | Hay detalles de organización: el notebook 04 usa guion en el nombre, el mapeo de regiones está guardado en `interim/` aunque es un dato de referencia, `.gitignore` excluye `processed/` en cualquier nivel, no hay `LICENSE`, el nombre `Hito1` no describe la herramienta, `requirements.txt` incluye dependencias transitivas y el README tiene erratas en las líneas 11 y 60. | Observación |
+
+A continuación, se plantea la solución a los problemas encontrados. Se advierte antes que la solución se realiza directamente en main.py, sin pasar por los notebooks de exploración, pues ya cumplieron su propósito inicial.
+
+## H-01
+
+En la versión anterior (antes de la auditoría), las observaciones se clasificaban a través de patrones de ```regex``` que contenían palabras clave según las cuales se asignaba un estado (rojo, naranja, amarillo o verde). Con el DataSet trabajado, el principio funcionaba, pues no había casos ambiguos que devolvieran True para dos o más de esas máscaras booleanas. Sin embargo, si en algún momento se introducía un caso ambiguo como "Urgente, pero sin novedad", por ejemplo, dos de esas máscaras se marcaban como True: la máscara para los casos "rojo" y "verde". Como las cuatro máscaras se verificaban siempre y "verde" era la última, "estado" quedaba marcado en "verde" pues ```.loc``` asignaba a "estado" el último True hallado, lo que generaba un conflicto con la severidad del caso. Esto se pudo haber solucionado invirtiendo el orden de las máscaras para que se verificaran en el orden "verde", "amarillo", "naranja", "rojo", pero esta solución dependía de que en ningún momento se tocara este orden.
+
+Se solucionó a través del uso de ```np.select```, de manera tal que las condiciones quedaran asignadas a una sola variable más fácil de gestionar. Esta herramienta permite que cada observación quede marcada de una sola vez y que los estados no se solapen entre sí porque ```np.select``` se queda únicamente con la primera condición que se cumple.
+
+También se agregó a la máscara de "verde" el límite de palabra ```\bnormal\b``` para que otras como "anormal" o "normalmente" no se colaran.
+
+### Solución
+
+```python
+    observaciones=df["Observaciones"]
+
+    condiciones=[observaciones.str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False), #[e]?s? en vez de agrupar (es)?: tolera errores de tipeo de una letra (ej. "estructurale"), decisión deliberada
+                 observaciones.str.contains(r"prioritario|incomplet[ao]?s?\b|recolec\w*\b.*parcial\w*\b",case=False), #.* (no \s*) permite palabras intermedias, ej. "recolectado de forma parcial", no solo espacios
+                 observaciones.str.contains(r"important", case=False), #Se verificó que "important" (sin la "e" final) no genera falsos positivos con "importación"/"importador", a diferencia de "import". No fue el motivo original (fue corrección de un typo), pero es una propiedad útil verificada.
+                 observaciones.str.contains(r"[ée]xito[s]?[oa]?|sin novedad|\bnormal\b", case=False), #[ée] tolera tilde omitida en "éxito". Uso de \b para "normal", de manera tal que no se cuele "anormal".
+                 ]
+
+    etiquetas=["Rojo",
+               "Naranja",
+               "Amarillo",
+               "Verde"]
+
+    df["Estado"]=np.select(condiciones, etiquetas, default="Sin clasificar")
+```
+
+Todo lo que no cumpla una de las condiciones queda como "Sin clasificar".
+
