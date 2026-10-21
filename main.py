@@ -173,6 +173,24 @@ def is_phone_email(row):
     return phone, email
 
 def normalized_dates(dates):
+    '''
+    Convierte las fechas de distintos formatos al patrón día/mes/año y pone el año con 4 cifras.
+
+    Args:
+        dates (pd.Series): columna completa de las fechas del CSV a procesar.
+
+    Returns:
+        pd.Series: fechas en formato dd/mm/aaaa o con la etiqueta "Sin dato" cuando la fecha no se pudo procesar.
+    
+    Notes:
+        - Se usaron seis plantillas definidas en date_formats según los patrones encontrados en el CSV original. Cada plantilla se prueba en orden y cada fila
+        conserva la fecha leída con la estructura de la primera plantilla que funciona.
+        - %y convierte 00-68 en 2000-2068 y 69-99 en 1969-1999.
+        - Todo conjunto de dos cifras en la posición inicial de cualquier valor se interpreta como día.
+        - Para que %b funcione, cada abreviatura de los meses en español se traduce a su respectiva abreviatura en inglés.
+        - La traducción es case sensitive. Por ejemplo, "dic" no se lee y se etiqueta como "Sin dato".
+        - Una fecha imposible se marca como "Sin dato", p. ej.: 31/02/26. También se etiqueta así cualquier formato que no esté en las plantillas.
+    '''
     translated_months=dates.replace(months_spa_to_eng, regex=True)
     parsed=pd.Series(pd.NaT, index=dates.index)
 
