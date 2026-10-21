@@ -7,7 +7,7 @@ from pathlib import Path
 
 #Constantes/configuración
 
-date_formats = ["%d/%m/%y", "%d-%m-%y", "%Y-%m-%d", "%Y/%m/%d", "%b %d, %Y"]
+date_formats = ["%d/%m/%y", "%d-%m-%y", "%Y-%m-%d", "%Y/%m/%d", "%b %d, %Y", "%d/%m/%Y"]
 months_spa_to_eng = {r"\bEne\b": "Jan", r"\bAbr\b": "Apr", r"\bAgo\b": "Aug", r"\bDic\b": "Dec"}
 
 #Funciones
