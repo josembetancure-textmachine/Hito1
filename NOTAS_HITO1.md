@@ -742,3 +742,58 @@ También se agregó a la máscara de "verde" el límite de palabra ```\bnormal\b
 
 Todo lo que no cumpla una de las condiciones queda como "Sin clasificar".
 
+## H-02
+
+En la versión anterior (antes de la auditoría), se usaba ```regex``` para llevar las fechas al formato día/mes/año a través de dos funciones distintas. Es decir, las fechas se trataban como texto al que solo se le reordenaban sus partes. Esto ocasionaba que los años con dos cifras no se pudieran llevar fácilmente a su forma de 4 cifras y, por eso, 51 fechas quedaban con el año de dos dígitos. Además, el patrón solo leía días y meses con dos dígitos exactamente, por lo que aquellas fechas que solo tuvieran días o meses de una sola cifra no se transformaban. Por su parte, los meses que no estuvieran en "months_map" lanzaban KeyError.
+
+### Solución
+
+```python
+df["Fecha_Registro"]=normalized_dates(df["Fecha_Registro"])
+
+def normalized_dates(dates):
+    '''
+    Convierte las fechas de distintos formatos al patrón día/mes/año y pone el año con 4 cifras.
+
+    Args:
+        dates (pd.Series): columna completa de las fechas del CSV a procesar.
+
+    Returns:
+        pd.Series: fechas en formato dd/mm/aaaa o con la etiqueta "Sin dato" cuando la fecha no se pudo procesar.
+    
+    Notes:
+        - Se usaron seis plantillas definidas en date_formats según los patrones encontrados en el CSV original. Cada plantilla se prueba en orden y cada fila
+        conserva la fecha leída con la estructura de la primera plantilla que funciona.
+        - %y convierte 00-68 en 2000-2068 y 69-99 en 1969-1999.
+        - Todo conjunto de dos cifras en la posición inicial de cualquier valor se interpreta como día.
+        - Para que %b funcione, cada abreviatura de los meses en español se traduce a su respectiva abreviatura en inglés.
+        - La traducción es case sensitive. Por ejemplo, "dic" no se lee y se etiqueta como "Sin dato".
+        - Una fecha imposible se marca como "Sin dato", p. ej.: 31/02/26. También se etiqueta así cualquier formato que no esté en las plantillas.
+    '''
+    translated_months=dates.replace(months_spa_to_eng, regex=True)
+    parsed=pd.Series(pd.NaT, index=dates.index)
+
+    for dates_format in date_formats:
+        attempt=pd.to_datetime(translated_months, format=dates_format, errors="coerce")
+        parsed=parsed.fillna(attempt)
+
+    parsed=parsed.dt.strftime("%d/%m/%Y")
+    parsed=parsed.fillna("Sin dato")
+
+    return parsed
+```
+
+**Nota:** 
+1. La primera línea, dentro de main.py, va en el bloque __main__. Aquí se pone al comienzo para fines ilustrativos.
+2. Se descartó dayfirst=True, format="mixed" porque pandas aplica “día primero” también a las fechas que empiezan por el año, y en este CSV eso convertía 2026/02/12 en 2 de diciembre (6 filas afectadas), cuando en realidad es 12 de febrero. Este problema ocurre siempre que una fecha que comienza por año tenga valores iguales o menores a 12 en las siguientes posiciones. 
+
+**Explicación del código:**
+
+1. Se reemplazan las abreviaturas de los meses en español por sus correspondientes en inglés.
+2. Se guarda un pd.Series en "parsed" cuyos valores, inicialmente, son todos NaT. Esta Series tiene el mismo tamaño e índices de la columna con las fechas del CSV original, pues lo que recibe la función es el parámetro "dates" que viene de  ```df["Fecha_Registro"]=normalized_dates(df["Fecha_Registro"])```.
+3. Se recorren los patrones de fecha.
+4. Por cada una de las 6 vueltas, se prueba un patrón a la vez. Se conserva la fecha que coincida con ese patrón. La iteración ocurre sobre la Series con los meses ya traducidos, es decir "translated_months". Gracias a "coerce", lo que no coincida se marca como NaT.
+5. Los valores NaT de parsed se comienzan a reemplazar por los valores del paso anterior.
+6. Se convierten las fechas que quedan en parsed a texto. Como .dt solo funciona mientras los valores sean fechas, esta línea va afuera del for.
+7. Cualquier otro valor NaN (no NaT, pues el paso anterior convierte todos los NaT en NaN) que haya quedado en parsed se etiqueta como "Sin dato".
+
