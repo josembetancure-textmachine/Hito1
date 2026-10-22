@@ -9,6 +9,8 @@ from pathlib import Path
 
 date_formats = ["%d/%m/%y", "%d-%m-%y", "%Y-%m-%d", "%Y/%m/%d", "%b %d, %Y", "%d/%m/%Y"]
 months_spa_to_eng = {r"\bEne\b": "Jan", r"\bAbr\b": "Apr", r"\bAgo\b": "Aug", r"\bDic\b": "Dec"}
+email_pattern = r"[^\s:]+@[^\s:]+\.[^\s:]+"
+phone_pattern = r"\b\d{7,10}\b"
 
 #Funciones
 
@@ -97,78 +99,45 @@ def city_territories(city_list,progress=None):
 
     return city_territories_dic
 
-def split_phone_email(text):
+def extract_contact(text):
     '''
-    Separa los datos teléfono/correo según las condiciones impuestas y genera una lista con los mismos o la lista con el valor "Sin dato"
-    si text es vacío o NaN.
+    Separa los datos de contacto de un campo de texto.
 
     Args:
-        text (str): cadena de texto. Representa los valores de la columna "Contacto" del DataFrame original.
+        text (str): valor del campo de texto del DataSet original, concretamente de la columna df["Contacto"].
     
     Returns:
-        list: lista. Generada con el método split que contiene los datos teléfono/correo separados o la lista con el valor
-        "Sin dato" si text es vacío o NaN.
-    
-    Raises:
-        AttributeError: si text es un tipo de valor diferente a str.
-    '''
-
-    if pd.isna(text) or not text:
-        return ["Sin dato"]
-    elif text.startswith("Cel:"):
-        return text.replace(" ","").replace("Cel:","").split("Correo:")
-    elif text.startswith("Correo:"):
-        return text.replace(" ","").replace("Correo:","").split("Cel:")
-    elif "/" in text:
-        return text.replace(" ","").split("/")
-    elif "-" in text:
-        return text.replace(" ","").split("-")
-    else:
-        return text.split()
-
-def is_phone_email(row):
-    '''
-    Evalúa cada valor y determina si se trata de teléfono o de correo según las condiciones impuestas.
-
-    Args:
-        row (list): lista. Contiene los valores generados por la función split_phone_email.
-    
-    Returns:
-        tuple: tupla. Asigna una etiqueta "phone" o "email" a cada valor de la tupla en ese orden, según las condiciones impuestas, o "Sin dato"
-        para el valor (o ambos) faltante.
-    
-    Raises:
-        AttributeError: si row contiene valores que no sean tipo str.
+        tuple: contacto de teléfono y correo, en ese orden; uno de los dos valores puede tomar 
+        la etiqueta "Sin dato" si no se encuentra. Puede devolver, también, dos valores etiquetados "Sin dato" si el campo de texto es NaN o vacío. 
     
     Notes:
-        La función depende de que row contenga uno o dos elementos de tipo str.
+        - La función trabaja concretamente con patrones regex para el teléfono y el correo. No depende de los separadores que haya entre los dos datos.
+        - Primero se busca el correo. Después, el correo se quita del argumento (text) para que, en caso de que los contenga, sus dígitos no sean susceptibles
+        de ser capturados por el patrón del teléfono.
+        - El teléfono se busca en lo que haya quedado del paso anterior.
+        - El patrón regex para el correo supone que siempre hay espacio entre el separador del correo y el teléfono. Si no hay espacio antes o después del
+        separador, el patrón no encuentra el correo con precisión, sino todo lo que halla hasta el siguiente espacio. 
+        P. ej.: juan@d.com/3001234567, (Sin dato, juan@d.com/3001234567)
+        - El patrón regex del teléfono no cuenta con que haya espacios internos. Si los hay, el patrón no captura bloques de menos de 7 dígitos.
+        P. ej.: 300 123 4567, "Sin dato"; 3001234 567, 3001234
+        - Si el campo tiene dos teléfonos o dos correos, solo se encuentra el primero que coincida con el patrón para ambos casos.
     '''
-    if len(row)==1:
-        if row[0].replace(" ","").isdigit():
-            phone=row[0]
-            email="Sin dato"
-        elif "@" in row[0]:
-            phone="Sin dato"
-            email=row[0]
-        elif row[0].replace("@","").replace("_","").replace(".","").isalnum():
-            phone="Sin dato"
-            email=row[0]
-        else:
-            phone="Sin dato"
-            email="Sin dato"
+    if pd.isna(text) or text.strip()=="":
+        return "Sin dato", "Sin dato"
+
+    email_match=re.search(email_pattern, text)
+    without_email=re.sub(email_pattern, "", text)
+    phone_match=re.search(phone_pattern, without_email)
+
+    if email_match is None:
+        email="Sin dato"
     else:
-        if row[0].replace(" ","").isdigit():
-            phone=row[0]
-            email=row[1]
-        elif "@" in row[0]:
-            phone=row[1]
-            email=row[0]
-        elif row[0].replace("@","").replace("_","").replace(".","").isalnum():
-            phone=row[1]
-            email=row[0]
-        else:
-            phone="Sin dato"
-            email="Sin dato"
+        email=email_match.group()
+
+    if phone_match is None:
+        phone="Sin dato"
+    else:
+        phone=phone_match.group()
 
     return phone, email
 
@@ -242,14 +211,10 @@ if __name__=="__main__":
 
     df["Región"]=df["Municipio"].map(mapping_dict) #Se cruza el diccionario con la tabla original. El diccionario tiene como llave al municipio y la región es el valor. Para buscar en el archivo original las llaves y reemplazar sus valores (cruce con el diccionario). Se usa map en vez de np.where, pues no hay condiciones lógicas que permitan fácilmente la comparación, sino una referencia 1 a 1; np.where es útil para cuando hay condiciones lógicas.
 
-    phone_email=df["Contacto"].apply(split_phone_email).tolist() #Se convierte a lista porque este resultado se usará con un ciclo for no vectorizable, pues contiene valores no uniformes en longitud, pues row puede contener 1 o 2 elementos según el caso.
+    results_contacts=df["Contacto"].apply(extract_contact).tolist()
 
-    results=[]
-    for row in phone_email:
-        results.append(is_phone_email(row))
-
-    phone_list=[phone for phone,email in results]
-    email_list=[email for phone,email in results]
+    phone_list=[phone for phone,email in results_contacts]
+    email_list=[email for phone,email in results_contacts]
 
     if "Teléfono" not in df.columns:
         df.insert(loc=4,column="Teléfono",value=phone_list)
