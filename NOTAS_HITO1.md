@@ -749,7 +749,7 @@ En la versión anterior (antes de la auditoría), se usaba ```regex``` para llev
 ### Solución
 
 ```python
-df["Fecha_Registro"]=normalized_dates(df["Fecha_Registro"])
+df["Fecha_Registro"]=normalized_dates(df["Fecha_Registro"]) #Va dentro del bloque __main__ en main.py. Aquí se pone antes de la función para fines ilustrativos.
 
 def normalized_dates(dates):
     '''
@@ -796,4 +796,71 @@ def normalized_dates(dates):
 5. Los valores NaT de parsed se comienzan a reemplazar por los valores del paso anterior.
 6. Se convierten las fechas que quedan en parsed a texto. Como .dt solo funciona mientras los valores sean fechas, esta línea va afuera del for.
 7. Cualquier otro valor NaN (no NaT, pues el paso anterior convierte todos los NaT en NaN) que haya quedado en parsed se etiqueta como "Sin dato".
+
+## H-03
+
+En la versión anterior (antes de la auditoría), la separación entre teléfono y correo se hacía con dos funciones: ```split_phone_email``` y ```is_phone_email```. La primera partía el texto según el separador que encontrara ("Cel:", "Correo:", "/" o "-") y la segunda asignaba cada pedazo según su posición: si el primer elemento era numérico, era teléfono y el segundo era correo; si contenía "@", era correo y el segundo era teléfono. Es decir, el código no buscaba el teléfono ni el correo, sino lo que había antes y después del separador. Con el DataSet trabajado, el principio funcionaba, pues ningún correo contenía alguno de los caracteres usados como separadores. Sin embargo, el guion es un carácter válido dentro de un correo y, si en algún momento se introducía un caso como "puerto-claver@dominio.com", el ```split("-")``` partía el correo por la mitad: el teléfono quedaba como "claver@dominio.com" y el correo como "puerto". Además, ```is_phone_email``` solo miraba las dos primeras posiciones de la lista, por lo que un tercer elemento se perdía sin aviso y el segundo se tomaba como correo sin comprobar que tuviera "@". Por su parte, el resultado dependía del orden de los ```elif```: "puerto-claver@dominio.com / 3249208566" funcionaba solo porque "/" se evaluaba antes que "-". Ninguno de estos casos lanzaba error, así que los datos quedaban corrompidos en silencio.
+
+### Solución
+
+```python
+email_pattern = r"[^\s:]+@[^\s:]+\.[^\s:]+" #Va al comienzo de main.py, mucho antes de la función. Aquí se ponen contiguas a esta para fines ilustrativos.
+phone_pattern = r"\b\d{7,10}\b" #Va al comienzo de main.py, mucho antes de la función. Aquí se ponen contiguas a esta para fines ilustrativos.
+
+def extract_contact(text):
+    '''
+    Separa los datos de contacto de un campo de texto.
+
+    Args:
+        text (str): valor del campo de texto del DataSet original, concretamente de la columna df["Contacto"].
+    
+    Returns:
+        tuple: contacto de teléfono y correo, en ese orden; uno de los dos valores puede tomar 
+        la etiqueta "Sin dato" si no se encuentra. Puede devolver, también, dos valores etiquetados "Sin dato" si el campo de texto es NaN o vacío. 
+    
+    Notes:
+        - La función trabaja concretamente con patrones regex para el teléfono y el correo. No depende de los separadores que haya entre los dos datos.
+        - Primero se busca el correo. Después, el correo se quita del argumento (text) para que, en caso de que los contenga, sus dígitos no sean susceptibles
+        de ser capturados por el patrón del teléfono.
+        - El teléfono se busca en lo que haya quedado del paso anterior.
+        - El patrón regex para el correo supone que siempre hay espacio entre el separador del correo y el teléfono. Si no hay espacio antes o después del
+        separador, el patrón no encuentra el correo con precisión, sino todo lo que halla hasta el siguiente espacio. 
+        P. ej.: juan@d.com/3001234567, (Sin dato, juan@d.com/3001234567)
+        - El patrón regex del teléfono no cuenta con que haya espacios internos. Si los hay, el patrón no captura bloques de menos de 7 dígitos.
+        P. ej.: 300 123 4567, "Sin dato"; 3001234 567, 3001234
+        - Si el campo tiene dos teléfonos o dos correos, solo se encuentra el primero que coincida con el patrón para ambos casos.
+    '''
+    if pd.isna(text) or text.strip()=="":
+        return "Sin dato", "Sin dato"
+
+    email_match=re.search(email_pattern, text)
+    without_email=re.sub(email_pattern, "", text)
+    phone_match=re.search(phone_pattern, without_email)
+
+    if email_match is None:
+        email="Sin dato"
+    else:
+        email=email_match.group()
+
+    if phone_match is None:
+        phone="Sin dato"
+    else:
+        phone=phone_match.group()
+
+    return phone, email
+
+results_contacts=df["Contacto"].apply(extract_contact).tolist() #Va en el bloque __main__ dentro de main.py. Aquí se pone contigua a la función para fines ilustrativos.
+```
+**Explicación del código:**
+
+1. Las constantes ```email_pattern``` y ```phone_pattern``` contienen los patrones con los que se buscan el correo y el teléfono. En el patrón del correo, ```[^\s:]``` significa cualquier carácter menos un espacio o dos puntos. Se optó por una lista de caracteres prohibidos en vez de una lista de permitidos porque, para separar el correo del teléfono, no es necesario saber todo lo que un correo puede contener (letras, dígitos, ".", "-", "%", etc.), sino lo que nunca contiene dentro de este campo: los espacios que rodean a los separadores y los ":" de "Cel:" y "Correo:". El patrón del teléfono busca un bloque de 7 a 10 dígitos consecutivos (```\d{7,10}```) que no esté pegado a otros caracteres de palabra (```\b```). Es importante notar que ```{7,10}``` no lleva espacio después de la coma: con espacio, regex deja de leerlo como cuantificador y busca los caracteres literalmente.
+2. Si el campo es NaN o, después de quitarle los espacios, queda vacío, la función devuelve de inmediato "Sin dato" para ambos valores. El orden de las condiciones es indispensable: ```pd.isna(text)``` va primero porque un NaN es un float, no un str, y ```.strip()``` sobre un NaN genera AttributeError. Con ```or```, si la primera condición es verdadera, Python no evalúa la segunda. Además, se usa ```return``` y no una asignación, pues de lo contrario la función continuaría hasta el ```.strip()``` con el NaN.
+3. Se busca el correo con ```re.search```, que devuelve la primera coincidencia en cualquier parte del texto (un objeto Match) o ```None``` si no la encuentra. El resultado se guarda en "email_match".
+4. Con ```re.sub``` se borra el correo del texto y lo que queda se guarda en "without_email". El texto original no se modifica.
+5. Se busca el teléfono, pero solo en "without_email". Así se evita que los dígitos que pueda tener un correo se capturen como teléfono.
+6. Antes de extraer los valores se verifica si cada búsqueda encontró algo. Si es ```None```, se asigna "Sin dato"; si no, se extrae el texto con ```.group()```. Esta comprobación es necesaria porque llamar ```.group()``` sobre ```None``` genera error. Se usan nombres distintos para el objeto Match ("email_match") y para el valor final ("email") para no mezclar dos tipos de dato en una misma variable.
+7. La función devuelve teléfono y correo, en ese orden, pues es el orden que espera el resto del código.
+8. A diferencia de ```normalized_dates```, esta función trabaja celda por celda: recibe un solo str y no una Series. Por eso se aplica con ```.apply()``` sobre ```df["Contacto"]```. Como la función devuelve una tupla por celda, ```.tolist()``` genera una lista de tuplas, que es justo lo que antes construía el ciclo for con ```is_phone_email```. Las líneas siguientes, que crean "phone_list" y "email_list", no necesitaron cambios.
+9. Con las 135 filas originales, el teléfono y el correo de cada fila son idénticos a los de la versión anterior. La diferencia aparece en los casos que antes fallaban: "puerto-claver@dominio.com" ahora da (Sin dato, puerto-claver@dominio.com) y "3249208566 - puerto-claver@dominio.com" da (3249208566, puerto-claver@dominio.com).
+
 
