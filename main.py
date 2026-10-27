@@ -171,7 +171,30 @@ def normalized_dates(dates):
     parsed=parsed.fillna("Sin dato")
 
     return parsed
-    
+
+def print_closing_report(df):
+    print(f"[INFO] se procesaron {len(df)} filas.")
+
+    unclassified_count = (df["Estado"]=="Sin clasificar").sum()
+
+    if unclassified_count > 0:
+        print(f"[AVISO] Onservaciones con la etiqueta 'Sin clasificar': {unclassified_count}.")
+
+    na_regions = df["Región"].isna()
+    na_count= na_regions.sum()
+
+    if na_count>0:
+        towns_without_region=df.loc[na_regions, "Municipio"]
+        towns_without_region=towns_without_region.unique()
+        towns_without_region=sorted(towns_without_region)
+        print(f"[AVISO] Municipios sin región asignada todavía {towns_without_region}. Número de filas sin región: {na_count}.")
+
+    unclassified_date = (df["Fecha_Registro"]=="Sin dato").sum()
+
+    if unclassified_date > 0:
+        print(f"[AVISO] Fechas que fueron etiquetadas 'Sin dato': {unclassified_date}.")
+
+
 
 #Bloque if __name__=="__main__"
 
@@ -257,3 +280,5 @@ if __name__=="__main__":
     saved_file=saved_output_directory/"datos_limpios_hito1.csv"
 
     df.to_csv(saved_file,index=False,encoding="utf-8")
+
+    print_closing_report(df)
