@@ -230,7 +230,7 @@ if __name__=="__main__":
     df=pd.read_csv(actual_file)
 
     city_list=df["Municipio"].unique().tolist()
-    df_territories_accent=df[df["Región"].str.contains("á|é|í|ó|ú",case=False)]
+    df_territories_accent=df[df["Región"].str.contains("á|é|í|ó|ú",case=False, na=False)]
     list_accent=df_territories_accent["Región"].unique().tolist() 
 
     accent_normalization_dic={accent_normalization(a): a for a in list_accent}
@@ -273,10 +273,10 @@ if __name__=="__main__":
 
     observaciones = df["Observaciones"]
 
-    condiciones=[observaciones.str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False), #[e]?s? en vez de agrupar (es)?: tolera errores de tipeo de una letra (ej. "estructurale"), decisión deliberada
-                 observaciones.str.contains(r"prioritario|incomplet[ao]?s?\b|recolec\w*\b.*parcial\w*\b",case=False), #.* (no \s*) permite palabras intermedias, ej. "recolectado de forma parcial", no solo espacios
-                 observaciones.str.contains(r"important", case=False), #Se verificó que "important" (sin la "e" final) no genera falsos positivos con "importación"/"importador", a diferencia de "import". No fue el motivo original (fue corrección de un typo), pero es una propiedad útil verificada.
-                 observaciones.str.contains(r"[ée]xito[s]?[oa]?|sin novedad|\bnormal\b", case=False), #[ée] tolera tilde omitida en "éxito". Uso de \b para "normal", de manera tal que no se cuele "anormal".
+    condiciones=[observaciones.str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False, na=False), #[e]?s? en vez de agrupar (es)?: tolera errores de tipeo de una letra (ej. "estructurale"), decisión deliberada
+                 observaciones.str.contains(r"prioritario|incomplet[ao]?s?\b|recolec\w*\b.*parcial\w*\b",case=False, na=False), #.* (no \s*) permite palabras intermedias, ej. "recolectado de forma parcial", no solo espacios
+                 observaciones.str.contains(r"important", case=False, na=False), #Se verificó que "important" (sin la "e" final) no genera falsos positivos con "importación"/"importador", a diferencia de "import". No fue el motivo original (fue corrección de un typo), pero es una propiedad útil verificada.
+                 observaciones.str.contains(r"[ée]xito[s]?[oa]?|sin novedad|\bnormal\b", case=False, na=False), #[ée] tolera tilde omitida en "éxito". Uso de \b para "normal", de manera tal que no se cuele "anormal".
                  ]
 
     etiquetas=["Rojo",
@@ -290,7 +290,7 @@ if __name__=="__main__":
     new_order=first_cols+["Observaciones","Estado"]
     df=df[new_order]
 
-    names_nodata=df["Nombre_Informante"].isna()|(df["Nombre_Informante"].str.replace(" ","")=="")|(df["Nombre_Informante"].str.contains("N/A",case=False))|(df["Nombre_Informante"].str.contains("No registra",case=False))
+    names_nodata=df["Nombre_Informante"].isna()|(df["Nombre_Informante"].str.replace(" ","")=="")|(df["Nombre_Informante"].str.contains("N/A",case=False, na=False))|(df["Nombre_Informante"].str.contains("No registra",case=False, na=False))
     df.loc[names_nodata,"Nombre_Informante"]="Sin dato"
 
     names_data=df["Nombre_Informante"]!="Sin dato"
