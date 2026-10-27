@@ -173,12 +173,35 @@ def normalized_dates(dates):
     return parsed
 
 def print_closing_report(df):
+    '''
+    Imprime un informe de cierre al terminar el pipeline con los registros que el programa no pudo resolver.
+
+    Args:
+        df (pd.DataFrame): DataFrame ya procesado, después de guardarse en data/processed/.
+
+    Returns:
+        None: la función no devuelve ningún valor, solo imprime el informe en la terminal.
+
+    Notes:
+        - Siempre se imprime el número de filas procesadas. Cada aviso, en cambio, solo aparece si hay al menos un caso; si todo se resolvió,
+        el informe tiene una sola línea.
+        - Se reportan tres casos en los que el programa no pudo hacer su trabajo: observaciones que no coinciden con ninguna regla de estado
+        ("Sin clasificar"), municipios sin región asignada y fechas que no coinciden con ninguna plantilla ("Sin dato").
+        - Los "Sin dato" de los contactos y de los nombres no se reportan, pues corresponden a datos que faltan en el CSV original, no a fallos
+        del programa.
+        - No se muestran los índices de las filas afectadas: los valores ya están etiquetados en el CSV y se pueden filtrar con cualquier
+        programa que lo abra. Además, el pipeline no elimina ni reordena filas, por lo que cada fila del CSV procesado coincide con la del original.
+        - En el caso de las regiones sí se muestra la lista de municipios, porque es lo que el operador debe capturar en el JSON y su tamaño
+        no crece con el dataset.
+        - Si hay municipios sin región, el programa avisa, pero no se detiene: el CSV se guarda igual. Así se respeta que el operador termine
+        la captura con "-" para completarla en otra ejecución.
+    '''
     print(f"[INFO] se procesaron {len(df)} filas.")
 
     unclassified_count = (df["Estado"]=="Sin clasificar").sum()
 
     if unclassified_count > 0:
-        print(f"[AVISO] Onservaciones con la etiqueta 'Sin clasificar': {unclassified_count}.")
+        print(f"[AVISO] Observaciones con la etiqueta 'Sin clasificar': {unclassified_count}.")
 
     na_regions = df["Región"].isna()
     na_count= na_regions.sum()
