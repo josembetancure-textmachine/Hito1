@@ -863,4 +863,81 @@ results_contacts=df["Contacto"].apply(extract_contact).tolist() #Va en el bloque
 8. A diferencia de ```normalized_dates```, esta función trabaja celda por celda: recibe un solo str y no una Series. Por eso se aplica con ```.apply()``` sobre ```df["Contacto"]```. Como la función devuelve una tupla por celda, ```.tolist()``` genera una lista de tuplas, que es justo lo que antes construía el ciclo for con ```is_phone_email```. Las líneas siguientes, que crean "phone_list" y "email_list", no necesitaron cambios.
 9. Con las 135 filas originales, el teléfono y el correo de cada fila son idénticos a los de la versión anterior. La diferencia aparece en los casos que antes fallaban: "puerto-claver@dominio.com" ahora da (Sin dato, puerto-claver@dominio.com) y "3249208566 - puerto-claver@dominio.com" da (3249208566, puerto-claver@dominio.com).
 
+## H-04
 
+En la versión anterior (antes de la auditoría), había casos en los que el programa no podía hacer su trabajo y, sin embargo, terminaba su ejecución como si todo estuviera bien. Es decir, los fallos eran silenciosos. El primero ocurría con las observaciones: si una de ellas no coincidía con ninguna de las reglas de estado, quedaba con un valor nulo y nada indicaba que alguien debía revisarla (con la corrección de H-01, esas observaciones quedan etiquetadas como "Sin clasificar", pero el programa seguía sin avisarlo). El segundo ocurría con las regiones: si el operador terminaba la captura con "-" antes de asignar todas las regiones, ```city_territories``` devolvía un diccionario incompleto y el ```.map()``` dejaba vacía la columna "Región" en las filas de esos municipios. En una prueba en la que se quitaron Turbo y Amalfi del JSON, 12 filas quedaron sin región, el CSV se guardó igual y el programa no mostró ningún mensaje. A esto se sumó un caso surgido de la corrección de H-02: las fechas que no coinciden con ninguna plantilla quedan como "Sin dato", y tampoco se avisaba cuántas eran. Por su parte, las llamadas a ```.str.contains()``` no incluían ```na=False```. Con la versión de pandas del proyecto (3.0.3) esto no causa error, pues un valor nulo devuelve False, pero con pandas 2 la máscara contendría NaN y el programa se detendría con ValueError.
+
+Es importante notar la diferencia entre un dato que falta en el CSV original y un dato que el programa no pudo procesar. Un contacto vacío que se etiqueta como "Sin dato" es un dato que no existe en el origen y no requiere aviso. En cambio, una observación "Sin clasificar", un municipio sin región o una fecha ilegible son casos en los que el programa no pudo hacer su trabajo y, si no avisa, quien usa el resultado no puede distinguirlos de un resultado correcto. En una herramienta de priorización, un registro sin clasificar que nadie ve puede ser justo el caso urgente que se pierde.
+
+### Solución
+
+```python
+def print_closing_report(df):
+    '''
+    Imprime un informe de cierre al terminar el pipeline con los registros que el programa no pudo resolver.
+
+    Args:
+        df (pd.DataFrame): DataFrame ya procesado, después de guardarse en data/processed/.
+
+    Returns:
+        None: la función no devuelve ningún valor, solo imprime el informe en la terminal.
+
+    Notes:
+        - Siempre se imprime el número de filas procesadas. Cada aviso, en cambio, solo aparece si hay al menos un caso; si todo se resolvió,
+        el informe tiene una sola línea.
+        - Se reportan tres casos en los que el programa no pudo hacer su trabajo: observaciones que no coinciden con ninguna regla de estado
+        ("Sin clasificar"), municipios sin región asignada y fechas que no coinciden con ninguna plantilla ("Sin dato").
+        - Los "Sin dato" de los contactos y de los nombres no se reportan, pues corresponden a datos que faltan en el CSV original, no a fallos
+        del programa.
+        - No se muestran los índices de las filas afectadas: los valores ya están etiquetados en el CSV y se pueden filtrar con cualquier
+        programa que lo abra. Además, el pipeline no elimina ni reordena filas, por lo que cada fila del CSV procesado coincide con la del original.
+        - En el caso de las regiones sí se muestra la lista de municipios, porque es lo que el operador debe capturar en el JSON y su tamaño
+        no crece con el dataset.
+        - Si hay municipios sin región, el programa avisa, pero no se detiene: el CSV se guarda igual. Así se respeta que el operador termine
+        la captura con "-" para completarla en otra ejecución.
+    '''
+    print(f"[INFO] se procesaron {len(df)} filas.")
+
+    unclassified_count = (df["Estado"]=="Sin clasificar").sum()
+
+    if unclassified_count > 0:
+        print(f"[AVISO] Observaciones con la etiqueta 'Sin clasificar': {unclassified_count}.")
+
+    na_regions = df["Región"].isna()
+    na_count= na_regions.sum()
+
+    if na_count>0:
+        towns_without_region=df.loc[na_regions, "Municipio"]
+        towns_without_region=towns_without_region.unique()
+        towns_without_region=sorted(towns_without_region)
+        print(f"[AVISO] Municipios sin región asignada todavía {towns_without_region}. Número de filas sin región: {na_count}.")
+
+    unclassified_date = (df["Fecha_Registro"]=="Sin dato").sum()
+
+    if unclassified_date > 0:
+        print(f"[AVISO] Fechas que fueron etiquetadas 'Sin dato': {unclassified_date}.")
+
+df.to_csv(saved_file,index=False,encoding="utf-8") #Va en el bloque __main__ dentro de main.py. Aquí se pone contigua a la función para fines ilustrativos.
+print_closing_report(df) #Va en el bloque __main__, justo después de guardar el CSV.
+```
+
+Además, se agregó ```na=False``` a las siete llamadas de ```.str.contains()``` del bloque ```__main__```: la de las regiones con tilde, las cuatro de las reglas de estado y las dos de "Nombre_Informante". Por ejemplo:
+
+```python
+observaciones.str.contains(r"important", case=False, na=False)
+```
+
+**Explicación del código:**
+
+1. A diferencia de ```normalized_dates``` y ```extract_contact```, esta función no calcula nada que el programa use después: solo imprime en la terminal. Por eso no tiene ```return``` y se llama sola, en su propia línea, sin asignarla a ninguna variable. Toda función sin ```return``` devuelve ```None```; si se asignara a una variable, esta quedaría en ```None```.
+2. La primera línea imprime el número de filas procesadas con ```len(df)```. Se usa la etiqueta [INFO] y no [AVISO], pues no es un problema: es la única línea que aparece cuando todo se resolvió.
+3. Para las observaciones, ```(df["Estado"]=="Sin clasificar")``` genera una máscara booleana y ```.sum()``` cuenta los True, pues True vale 1. Se usa ```==``` y no ```.str.contains()``` porque se busca una coincidencia exacta con la etiqueta, no un pedazo del texto. Los paréntesis son necesarios para que ```.sum()``` se aplique a la máscara completa.
+4. El aviso solo se imprime si el conteo es mayor que 0. La condición es ```> 0``` y no ```> 1```, porque con ```> 1``` el caso de una sola observación sin clasificar no se mostraría.
+5. Para las regiones, se guarda la máscara ```df["Región"].isna()``` en "na_regions", pues se usa dos veces: para contar las filas sin región y para filtrar sus municipios.
+6. Dentro del ```if```, ```df.loc[na_regions, "Municipio"]``` toma solo las filas sin región y, de esas filas, solo la columna "Municipio". El resultado tiene un municipio por fila, con repeticiones. ```.unique()``` quita los repetidos y ```sorted()``` los ordena alfabéticamente y los convierte en lista, que al imprimirse en un f-string aparece con corchetes y comillas. Todo esto va dentro del ```if``` porque los municipios solo se necesitan si hay filas sin región.
+7. El aviso de regiones distingue entre municipios y filas: en la prueba con Turbo y Amalfi, la lista tiene dos municipios, pero son 12 las filas sin región.
+8. Para las fechas, se cuenta cuántas quedaron como "Sin dato", con la misma lógica de las observaciones.
+9. En los tres avisos, el número va al final del mensaje ("Fechas que fueron etiquetadas 'Sin dato': 1."). Así el mensaje se lee bien con uno o con varios casos, sin problemas de singular y plural.
+10. La función se llama después de ```df.to_csv(...)```, de manera que el informe describe lo que efectivamente quedó guardado. Si el guardado fallara, el programa se detendría antes del informe.
+11. ```na=False``` le indica a ```.str.contains()``` que un valor nulo cuente como False. Con pandas 3.0.3 no cambia ningún resultado, pero hace que el código siga funcionando con otra versión de pandas.
+12. Con las 135 filas originales, el CSV es idéntico al de la versión anterior y el informe muestra una sola línea: "[INFO] se procesaron 135 filas.". Con una observación sin regla, Turbo y Amalfi sin región y la fecha "Abril 05, 2026", aparecen los tres avisos: 1 observación, los municipios ['Amalfi', 'Turbo'] con 12 filas, y 1 fecha.
