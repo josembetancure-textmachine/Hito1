@@ -48,25 +48,20 @@ def is_input_valid(text):
         return False
     return text.replace(" ","").isalpha() #El AttributeError que se menciona no puede ocurrir en el flujo actual, pues a esta función solo llegarán valores tipo str.
 
-def city_territories(city_list,progress=None):
+def city_territories(city_list, accent_dic, progress=None):
     '''
     Genera un diccionario con cada llave->municipio y su valor->región asignado.
 
     Args:
 
         city_list (list): contiene cada municipio que se encuentra en el DataFrame original.
+        accent_dic (dict): contiene la región sin tilde, en minúscula y sin espacios; el valor es la región tal como debe escribirse.
         progress (dict, optional): diccionario que contiene cada llave->municipio y su valor->región asignado. Defaults to None.
 
     Returns:
         dict: diccionario con cada llave->municipio y su respectivo valor->región asignado.
     
-    Raises:
-        NameError: si accent_normalization_dic no está definido desde antes.
-
     Notes:
-        Esta función depende de 'accent_normalization_dic', un diccionario que se genera en una función previa. Si no está definido antes de ejecutar esta función
-        generará un NameError.
-
         Para mantener la modularidad, esta función no genera el diccionario 'progress' por sí misma. El diccionario con el que trabaja este argumento viene de afuera, si existe y, si no, lo asume como None.
     '''
 
@@ -91,7 +86,7 @@ def city_territories(city_list,progress=None):
             print ("La región solo puede contener letras.")
 
         territories_key=accent_normalization(territories_raw)
-        territories_processed=accent_normalization_dic.get(territories_key,territories_raw.title())
+        territories_processed=accent_dic.get(territories_key,territories_raw.title())
 
 
         print(f"Municipio: {c}, región: {territories_processed}")
@@ -246,7 +241,7 @@ if __name__=="__main__":
         raw_data_saved={}
     data_saved={k.strip():v for k,v in raw_data_saved.items()}
 
-    rpoint=city_territories(city_list, progress=data_saved)
+    rpoint=city_territories(city_list, accent_normalization_dic, progress=data_saved)
     with open (progress_file,"w") as f:
         json.dump(rpoint,f)
 
