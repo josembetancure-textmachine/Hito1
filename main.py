@@ -167,6 +167,44 @@ def normalized_dates(dates):
 
     return parsed
 
+def classify_status(observations):
+    r'''
+    Asigna un nivel de prioridad a cada observación según las palabras clave que contiene.
+
+    Args:
+        observations (pd.Series): columna de observaciones del DataFrame original, concretamente df["Observaciones"].
+
+    Returns:
+        pd.Series: estado de cada observación ("Rojo", "Naranja", "Amarillo", "Verde" o "Sin clasificar"), con el mismo índice
+        de la Serie recibida.
+
+    Notes:
+        - El orden de la lista de condiciones es la jerarquía de severidad: Rojo (afectación a la vida o la salud), Naranja
+        (afectación a los derechos), Amarillo (sin afectación, pero no fue una entrevista exitosa) y Verde (entrevista normal o exitosa).
+        - np.select se queda con la primera condición que se cumple. Por eso, una observación que activa dos reglas recibe el estado
+        de mayor severidad, p. ej.: "Urgente: revisar. Todo normal, sin novedad." queda como "Rojo".
+        - Las observaciones que no cumplen ninguna regla, o que están vacías, quedan como "Sin clasificar". print_closing_report las
+        cuenta al final del pipeline.
+        - np.select devuelve un arreglo de numpy sin índice; se envuelve en pd.Series con el índice de la entrada para que cada estado
+        corresponda a su fila.
+        - El patrón \bnormal\b evita que "anormal" cuente como "normal", pero tampoco reconoce "normalmente".
+        - La clasificación se hace por palabras clave, no por análisis semántico: frases como "no se pudo realizar la visita"
+        quedan como "Sin clasificar".
+    '''
+    condiciones=[observations.str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False, na=False), #[e]?s? en vez de agrupar (es)?: tolera errores de tipeo de una letra (ej. "estructurale"), decisión deliberada
+                 observations.str.contains(r"prioritario|incomplet[ao]?s?\b|recolec\w*\b.*parcial\w*\b",case=False, na=False), #.* (no \s*) permite palabras intermedias, ej. "recolectado de forma parcial", no solo espacios
+                 observations.str.contains(r"important", case=False, na=False), #Se verificó que "important" (sin la "e" final) no genera falsos positivos con "importación"/"importador", a diferencia de "import". No fue el motivo original (fue corrección de un typo), pero es una propiedad útil verificada.
+                 observations.str.contains(r"[ée]xito[s]?[oa]?|sin novedad|\bnormal\b", case=False, na=False), #[ée] tolera tilde omitida en "éxito". Uso de \b para "normal", de manera tal que no se cuele "anormal".
+                 ]
+
+    etiquetas=["Rojo",
+               "Naranja",
+               "Amarillo",
+               "Verde"]
+
+    return pd.Series(np.select(condiciones, etiquetas, default="Sin clasificar"), index=observations.index)
+
+
 def print_closing_report(df):
     '''
     Imprime un informe de cierre al terminar el pipeline con los registros que el programa no pudo resolver.
@@ -265,20 +303,7 @@ if __name__=="__main__":
     if "Contacto" in df.columns:
         df.drop(columns=["Contacto"],inplace=True)
 
-    observaciones = df["Observaciones"]
-
-    condiciones=[observaciones.str.contains(r"urgente|riesgo|fall[ao]s?\b\s*estructural[e]?s?\b",case=False, na=False), #[e]?s? en vez de agrupar (es)?: tolera errores de tipeo de una letra (ej. "estructurale"), decisión deliberada
-                 observaciones.str.contains(r"prioritario|incomplet[ao]?s?\b|recolec\w*\b.*parcial\w*\b",case=False, na=False), #.* (no \s*) permite palabras intermedias, ej. "recolectado de forma parcial", no solo espacios
-                 observaciones.str.contains(r"important", case=False, na=False), #Se verificó que "important" (sin la "e" final) no genera falsos positivos con "importación"/"importador", a diferencia de "import". No fue el motivo original (fue corrección de un typo), pero es una propiedad útil verificada.
-                 observaciones.str.contains(r"[ée]xito[s]?[oa]?|sin novedad|\bnormal\b", case=False, na=False), #[ée] tolera tilde omitida en "éxito". Uso de \b para "normal", de manera tal que no se cuele "anormal".
-                 ]
-
-    etiquetas=["Rojo",
-               "Naranja",
-               "Amarillo",
-               "Verde"]
-
-    df["Estado"]=np.select(condiciones, etiquetas, default="Sin clasificar")
+    df["Estado"]=classify_status(df["Observaciones"])
 
     first_cols=[col for col in df.columns if col not in ["Observaciones","Estado"]]
     new_order=first_cols+["Observaciones","Estado"]
