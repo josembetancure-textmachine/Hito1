@@ -167,6 +167,32 @@ def normalized_dates(dates):
 
     return parsed
 
+def normalized_names(names):
+    '''
+    Normaliza los nombres de los informantes: etiqueta los faltantes como "Sin dato" y pone los demás en formato título.
+
+    Args:
+        names (pd.Series): columna de nombres del DataFrame original, concretamente df["Nombre_Informante"].
+
+    Returns:
+        pd.Series: nombres en formato título o con la etiqueta "Sin dato", con el mismo índice de la Serie recibida.
+
+    Notes:
+        - Se considera faltante un nombre que sea NaN, que quede vacío después de quitarle los espacios, o que contenga "N/A" o
+        "No registra" (sin distinguir mayúsculas y minúsculas).
+        - El formato título se aplica solo a los nombres que no son "Sin dato"; de lo contrario, la etiqueta quedaría como "Sin Dato".
+        - .str.title() pone en mayúscula la primera letra de cada palabra, incluidas las partículas: "MARÍA DE LOS ÁNGELES" queda
+        como "María De Los Ángeles".
+        - La función trabaja sobre una copia de la columna, así que el resultado debe asignarse de nuevo al DataFrame.
+    '''
+    names_nodata=names.isna()|(names.str.replace(" ","")=="")|(names.str.contains("N/A",case=False, na=False))|(names.str.contains("No registra",case=False, na=False))
+    names.loc[names_nodata]="Sin dato"
+    
+    names_data=names!="Sin dato"
+    names.loc[names_data]=names.loc[names_data].str.title()
+    return names
+
+
 def classify_status(observations):
     r'''
     Asigna un nivel de prioridad a cada observación según las palabras clave que contiene.
@@ -309,11 +335,7 @@ if __name__=="__main__":
     new_order=first_cols+["Observaciones","Estado"]
     df=df[new_order]
 
-    names_nodata=df["Nombre_Informante"].isna()|(df["Nombre_Informante"].str.replace(" ","")=="")|(df["Nombre_Informante"].str.contains("N/A",case=False, na=False))|(df["Nombre_Informante"].str.contains("No registra",case=False, na=False))
-    df.loc[names_nodata,"Nombre_Informante"]="Sin dato"
-
-    names_data=df["Nombre_Informante"]!="Sin dato"
-    df.loc[names_data,"Nombre_Informante"]=df.loc[names_data,"Nombre_Informante"].str.title()
+    df["Nombre_Informante"]=normalized_names(df["Nombre_Informante"])
 
     df["Fecha_Registro"]=normalized_dates(df["Fecha_Registro"])
 
