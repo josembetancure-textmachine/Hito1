@@ -224,6 +224,7 @@ if __name__=="__main__":
         raise FileNotFoundError("Falta el insumo de trabajo. Debe nombrarlo como \"datos_sucios_hito1.csv\" y guardarlo en data/raw/")
     df=pd.read_csv(actual_file)
 
+    df["Municipio"]=df["Municipio"].str.strip() #Se normalizan los espacios en Municipio con .str.strip() porque el CSV original puede traer inconsistencias de espacios que impiden que las llaves coincidan exactamente con las del JSON de regiones. Sin esto, el .map() posterior dejaría varias filas sin región asignada. Además, evita que el mismo municipio aparezca dos veces en city_list.
     city_list=df["Municipio"].unique().tolist()
     df_territories_accent=df[df["Región"].str.contains("á|é|í|ó|ú",case=False, na=False)]
     list_accent=df_territories_accent["Región"].unique().tolist() 
@@ -244,8 +245,6 @@ if __name__=="__main__":
     rpoint=city_territories(city_list, accent_normalization_dic, progress=data_saved)
     with open (progress_file,"w") as f:
         json.dump(rpoint,f)
-
-    df["Municipio"]=df["Municipio"].str.strip() #Se normalizan los espacios en Municipio con .str.strip() porque el CSV original trae inconsistencias de espacios que impiden que las llaves coincidan exactamente con las del JSON de regiones. Sin esto, el .map() posterior dejaría varias filas sin región asignada.
 
     with open(progress_file,"r") as f:
         mapping_dict=json.load(f)
