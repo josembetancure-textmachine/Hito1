@@ -136,6 +136,40 @@ def extract_contact(text):
 
     return phone, email
 
+def split_contacts(df):
+    '''
+    Separa la columna "Contacto" en dos columnas nuevas, "Teléfono" y "Correo", y elimina la columna original.
+
+    Args:
+        df (pd.DataFrame): DataFrame original, que debe contener la columna "Contacto".
+
+    Returns:
+        pd.DataFrame: un DataFrame nuevo con las columnas "Teléfono" y "Correo" y sin la columna "Contacto".
+
+    Notes:
+        - Cada valor de "Contacto" se procesa con extract_contact, que devuelve una tupla (teléfono, correo). Con .tolist() se obtiene
+        una lista de tuplas, que luego se separa en una lista de teléfonos y otra de correos.
+        - La función trabaja sobre una copia (df.copy()), por lo que no modifica el DataFrame recibido. Sin la copia, insert y drop
+        modificarían el mismo objeto que se pasó como argumento.
+        - Las columnas nuevas se insertan en las posiciones 4 y 5, según el orden de columnas del CSV original.
+    '''
+    df=df.copy()
+    results_contacts=df["Contacto"].apply(extract_contact).tolist()
+
+    phone_list=[phone for phone,email in results_contacts]
+    email_list=[email for phone,email in results_contacts]
+
+    if "Teléfono" not in df.columns:
+        df.insert(loc=4,column="Teléfono",value=phone_list)
+
+    if "Correo" not in df.columns:
+        df.insert(loc=5,column="Correo",value=email_list)
+
+    if "Contacto" in df.columns:
+        df.drop(columns=["Contacto"],inplace=True)
+
+    return df
+
 def normalized_dates(dates):
     '''
     Convierte las fechas de distintos formatos al patrón día/mes/año y pone el año con 4 cifras.
@@ -315,19 +349,7 @@ if __name__=="__main__":
 
     df["Región"]=df["Municipio"].map(mapping_dict) #Se cruza el diccionario con la tabla original. El diccionario tiene como llave al municipio y la región es el valor. Para buscar en el archivo original las llaves y reemplazar sus valores (cruce con el diccionario). Se usa map en vez de np.where, pues no hay condiciones lógicas que permitan fácilmente la comparación, sino una referencia 1 a 1; np.where es útil para cuando hay condiciones lógicas.
 
-    results_contacts=df["Contacto"].apply(extract_contact).tolist()
-
-    phone_list=[phone for phone,email in results_contacts]
-    email_list=[email for phone,email in results_contacts]
-
-    if "Teléfono" not in df.columns:
-        df.insert(loc=4,column="Teléfono",value=phone_list)
-
-    if "Correo" not in df.columns:
-        df.insert(loc=5,column="Correo",value=email_list)
-
-    if "Contacto" in df.columns:
-        df.drop(columns=["Contacto"],inplace=True)
+    df=split_contacts(df)
 
     df["Estado"]=classify_status(df["Observaciones"])
 
