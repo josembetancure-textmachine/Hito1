@@ -31,6 +31,28 @@ def accent_normalization(text):
             .replace("ó","o")
             .replace("ú","u"))
 
+def build_accent_dic(regions):
+    '''
+    Genera el diccionario de acentos a partir de las regiones que llevan tilde en el DataFrame original.
+
+    Args:
+        regions (pd.Series): columna de regiones del DataFrame original, concretamente df["Región"].
+
+    Returns:
+        dict: diccionario con cada llave->región sin tilde, en minúscula y sin espacios, y su valor->región tal como debe escribirse.
+
+    Notes:
+        - Solo se usan las regiones que tienen al menos una vocal con tilde, porque son las únicas en las que el input del usuario
+        puede diferir de la forma correcta por una tilde omitida.
+        - El diccionario lo usa city_territories para corregir la región que ingresa el usuario: si escribe "uraba", se guarda "Urabá".
+        - regions[máscara] devuelve directamente los valores de la columna que cumplen la condición, sin tener que seleccionar
+        la columna, como sí ocurre con df[máscara].
+    '''
+    regions_with_accent=regions[regions.str.contains("á|é|í|ó|ú",case=False, na=False)]
+    list_accent=regions_with_accent.unique().tolist()
+    return {accent_normalization(a): a for a in list_accent}
+
+
 def is_input_valid(text):
     '''
     Devuelve un valor boleano true/false según si el input cumple con las condiciones de una cadena de texto según los parámetros de unicode.
@@ -343,10 +365,8 @@ if __name__=="__main__":
 
     df["Municipio"]=df["Municipio"].str.strip() #Se normalizan los espacios en Municipio con .str.strip() porque el CSV original puede traer inconsistencias de espacios que impiden que las llaves coincidan exactamente con las del JSON de regiones. Sin esto, el .map() posterior dejaría varias filas sin región asignada. Además, evita que el mismo municipio aparezca dos veces en city_list.
     city_list=df["Municipio"].unique().tolist()
-    df_territories_accent=df[df["Región"].str.contains("á|é|í|ó|ú",case=False, na=False)]
-    list_accent=df_territories_accent["Región"].unique().tolist() 
 
-    accent_normalization_dic={accent_normalization(a): a for a in list_accent}
+    accent_normalization_dic=build_accent_dic(df["Región"])
 
     progress_root=project_root/"data"/"interim"
     progress_root.mkdir(parents=True,exist_ok=True)
