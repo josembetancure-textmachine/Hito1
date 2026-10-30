@@ -52,6 +52,47 @@ def build_accent_dic(regions):
     list_accent=regions_with_accent.unique().tolist()
     return {accent_normalization(a): a for a in list_accent}
 
+def load_progress(progress_file):
+    '''
+    Carga el progreso guardado de la asignación de regiones desde el JSON de data/interim/.
+
+    Args:
+        progress_file (Path): ruta del archivo JSON en el que se guarda el progreso.
+
+    Returns:
+        dict: diccionario con cada llave->municipio sin espacios al inicio ni al final y su valor->región asignada. Si el archivo no existe, devuelve un diccionario vacío.
+
+    Notes:
+        - El diccionario vacío permite que city_territories pida todas las regiones desde cero cuando no hay progreso previo.
+        - Las llaves se limpian con strip() porque los municipios del CSV original traían espacios; sin esa limpieza, un municipio ya asignado no coincidiría con su llave y se volvería a pedir.
+        - Se descartó pd.read_json(..., typ='series') porque el archivo es un diccionario, no un DataFrame: pandas interpretaría las llaves como índice y los valores como datos de una Series. Es más directo usar la librería json estándar.
+    '''
+    if progress_file.exists():
+        with open(progress_file, "r") as f:
+            raw_data_saved=json.load(f)
+    else:
+        raw_data_saved={}
+
+    return {k.strip():v for k,v in raw_data_saved.items()}
+
+def save_progress(region_map, progress_file):
+    '''
+    Guarda en el JSON de data/interim/ el diccionario de municipios y regiones asignadas.
+
+    Args:
+        region_map (dict): diccionario con cada llave->municipio y su valor->región asignada.
+        progress_file (Path): ruta del archivo JSON en el que se guarda el progreso.
+
+    Returns:
+        None: la función no devuelve nada; su único efecto es escribir el archivo.
+
+    Notes:
+        - Abre el archivo en modo "w", por lo que sobrescribe el progreso anterior en lugar de agregarle datos. Esto no pierde información, porque region_map ya incluye el progreso previo que cargó load_progress.
+        - Se llama en su propia línea, sin asignarla a una variable, porque no hay valor de retorno que guardar.
+    '''
+    with open(progress_file,"w") as f:
+        json.dump(region_map,f)
+
 
 def is_input_valid(text):
     '''
@@ -372,21 +413,12 @@ if __name__=="__main__":
     progress_root.mkdir(parents=True,exist_ok=True)
     progress_file=progress_root/"progress_territories.json"
 
-    if progress_file.exists():
-        with open(progress_file, "r") as f: #Se descartó pd.read_json(..., typ='series') para cargar el mapeo de regiones, porque el archivo es técnicamente un diccionario, no un DataFrame — pandas interpretaría las llaves como columnas y los valores como filas, sin índices reales. Es más correcto y directo usar la librería json estándar.
-            raw_data_saved=json.load(f)
-    else:
-        raw_data_saved={}
-    data_saved={k.strip():v for k,v in raw_data_saved.items()}
+    data_saved=load_progress(progress_file)
 
     rpoint=city_territories(city_list, accent_normalization_dic, progress=data_saved)
-    with open (progress_file,"w") as f:
-        json.dump(rpoint,f)
+    save_progress(rpoint, progress_file)
 
-    with open(progress_file,"r") as f:
-        mapping_dict=json.load(f)
-
-    df["Región"]=df["Municipio"].map(mapping_dict) #Se cruza el diccionario con la tabla original. El diccionario tiene como llave al municipio y la región es el valor. Para buscar en el archivo original las llaves y reemplazar sus valores (cruce con el diccionario). Se usa map en vez de np.where, pues no hay condiciones lógicas que permitan fácilmente la comparación, sino una referencia 1 a 1; np.where es útil para cuando hay condiciones lógicas.
+    df["Región"]=df["Municipio"].map(rpoint) #Se cruza el diccionario con la tabla original. El diccionario tiene como llave al municipio y la región es el valor. Para buscar en el archivo original las llaves y reemplazar sus valores (cruce con el diccionario). Se usa map en vez de np.where, pues no hay condiciones lógicas que permitan fácilmente la comparación, sino una referencia 1 a 1; np.where es útil para cuando hay condiciones lógicas.
 
     df=split_contacts(df)
 
