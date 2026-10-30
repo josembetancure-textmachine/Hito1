@@ -264,6 +264,25 @@ def classify_status(observations):
 
     return pd.Series(np.select(condiciones, etiquetas, default="Sin clasificar"), index=observations.index)
 
+def reorder_columns(df):
+    '''
+    Mueve las columnas "Observaciones" y "Estado" al final del DataFrame, sin cambiar el orden de las demás.
+
+    Args:
+        df (pd.DataFrame): DataFrame procesado, que debe contener las columnas "Observaciones" y "Estado".
+
+    Returns:
+        pd.DataFrame: un DataFrame nuevo con "Observaciones" y "Estado" como las dos últimas columnas.
+
+    Notes:
+        - Las demás columnas conservan el orden que traían. Así, la prioridad queda junto al texto que la justifica.
+        - df[new_order] crea un DataFrame nuevo, por lo que la función no modifica el DataFrame recibido y no necesita df.copy().
+    '''
+    first_cols=[col for col in df.columns if col not in ["Observaciones","Estado"]]
+    new_order=first_cols+["Observaciones","Estado"]
+    df=df[new_order]
+    return df
+
 
 def print_closing_report(df):
     '''
@@ -353,9 +372,7 @@ if __name__=="__main__":
 
     df["Estado"]=classify_status(df["Observaciones"])
 
-    first_cols=[col for col in df.columns if col not in ["Observaciones","Estado"]]
-    new_order=first_cols+["Observaciones","Estado"]
-    df=df[new_order]
+    df=reorder_columns(df)
 
     df["Nombre_Informante"]=normalized_names(df["Nombre_Informante"])
 
