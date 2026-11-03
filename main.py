@@ -14,6 +14,24 @@ phone_pattern = r"\b\d{7,10}\b"
 
 #Funciones
 
+def load_raw_data(raw_file):
+    '''
+    Carga el DataSet sobre el que trabajará todo el pipeline.
+
+    Args:
+        raw_file (Path): ruta donde está el insumo original.
+    
+    Returns:
+        pd.DataFrame: DataFrame cargado en memoria.
+    
+    Raises:
+        FileNotFoundError: si el insumo de trabajo no se encuentra en la ruta correspondiente o está mal nombrado.
+    '''
+    if not raw_file.exists():
+        raise FileNotFoundError("Falta el insumo de trabajo. Debe nombrarlo como \"datos_sucios_hito1.csv\" y guardarlo en data/raw/")
+    df=pd.read_csv(raw_file)
+    return df
+
 def accent_normalization(text):
     '''
     Elimina acentos ortográficos del input.
@@ -346,6 +364,26 @@ def reorder_columns(df):
     df=df[new_order]
     return df
 
+def save_output(df, output_file):
+    '''
+    Guarda el DataFrame final como CSV en la ruta indicada, creando antes la carpeta si no existe.
+
+    Args:
+        df (pd.DataFrame): DataFrame ya limpio y procesado por el pipeline.
+        output_file (Path): ruta completa del CSV de salida, incluido el nombre del archivo.
+
+    Returns:
+        None: la función no devuelve nada; su único efecto es escribir el archivo.
+
+    Notes:
+        - La carpeta se obtiene con output_file.parent, que es un atributo (sin paréntesis); el método que la crea es .mkdir().
+        - parents=True crea también las carpetas intermedias que falten, y exist_ok=True evita el error FileExistsError cuando la carpeta ya existe.
+        - to_csv sobrescribe el archivo anterior, por lo que cada ejecución del pipeline reemplaza la salida previa en lugar de acumularla.
+        - Recibe la ruta del archivo y no la de la carpeta: así no puede recibir una carpeta que no corresponda al archivo.
+    '''
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output_file,index=False,encoding="utf-8")
+
 
 def print_closing_report(df):
     '''
@@ -393,16 +431,13 @@ def print_closing_report(df):
         print(f"[AVISO] Fechas que fueron etiquetadas 'Sin dato': {unclassified_date}.")
 
 
-
 #Bloque if __name__=="__main__"
 
 if __name__=="__main__":
 
     project_root=Path(__file__).resolve().parent
     actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
-    if not actual_file.exists():
-        raise FileNotFoundError("Falta el insumo de trabajo. Debe nombrarlo como \"datos_sucios_hito1.csv\" y guardarlo en data/raw/")
-    df=pd.read_csv(actual_file)
+    df=load_raw_data(actual_file)
 
     df["Municipio"]=df["Municipio"].str.strip() #Se normalizan los espacios en Municipio con .str.strip() porque el CSV original puede traer inconsistencias de espacios que impiden que las llaves coincidan exactamente con las del JSON de regiones. Sin esto, el .map() posterior dejaría varias filas sin región asignada. Además, evita que el mismo municipio aparezca dos veces en city_list.
     city_list=df["Municipio"].unique().tolist()
@@ -430,10 +465,7 @@ if __name__=="__main__":
 
     df["Fecha_Registro"]=normalized_dates(df["Fecha_Registro"])
 
-    saved_output_directory=project_root/"data"/"processed"
-    saved_output_directory.mkdir(parents=True, exist_ok=True)
-    saved_file=saved_output_directory/"datos_limpios_hito1.csv"
+    saved_file = project_root / "data" / "processed" / "datos_limpios_hito1.csv"
 
-    df.to_csv(saved_file,index=False,encoding="utf-8")
-
+    save_output(df, saved_file)
     print_closing_report(df)
