@@ -941,3 +941,102 @@ observaciones.str.contains(r"important", case=False, na=False)
 10. La función se llama después de ```df.to_csv(...)```, de manera que el informe describe lo que efectivamente quedó guardado. Si el guardado fallara, el programa se detendría antes del informe.
 11. ```na=False``` le indica a ```.str.contains()``` que un valor nulo cuente como False. Con pandas 3.0.3 no cambia ningún resultado, pero hace que el código siga funcionando con otra versión de pandas.
 12. Con las 135 filas originales, el CSV es idéntico al de la versión anterior y el informe muestra una sola línea: "[INFO] se procesaron 135 filas.". Con una observación sin regla, Turbo y Amalfi sin región y la fecha "Abril 05, 2026", aparecen los tres avisos: 1 observación, los municipios ['Amalfi', 'Turbo'] con 12 filas, y 1 fecha.
+
+## H-09
+
+En la versión anterior (antes de la auditoría), casi toda la lógica del pipeline vivía directamente en el bloque ```if __name__=="__main__":```, unas 85 líneas seguidas sin funciones que las separaran. El programa funcionaba, pero su corrección dependía del orden exacto en que estaban escritas las líneas. Había dos problemas concretos. El primero: ```city_territories``` leía ```accent_normalization_dic``` sin recibirlo como parámetro. Esa variable se creaba en el bloque ```__main__```, de modo que la función solo servía si el bloque ya se había ejecutado; si se importaba desde otro archivo, fallaba con ```NameError```. El segundo: la lista de municipios se calculaba antes del ```.str.strip()```, por lo que un municipio con espacios (" Turbo ") no coincidía con su llave en el JSON y el programa pedía su región otra vez. Además, como nada estaba separado, no había forma de probar un paso sin ejecutar todo el pipeline, incluida la captura con ```input()```. Esto bloqueaba H-05.
+
+El criterio para decidir qué pasaba a una función y qué no se tomó de autores reconocidos en arquitectura de software. Parnas (1972) propone que cada módulo esconda una decisión que pueda cambiar, por ejemplo, dónde se guarda el progreso o qué formatos de fecha se aceptan. Fowler (*Refactoring*) sugiere extraer a una función todo fragmento que cueste esfuerzo entender y nombrarla por lo que hace, no por cómo lo hace. Martin (*Clean Code*) pide que cada función haga una sola cosa. Ousterhout (*A Philosophy of Software Design*) pone el contrapeso: una función que solo envuelve una línea obvia es «superficial» y agrega más costo del que ahorra. Por eso ```city_list```, el ```.map()``` de regiones y las rutas siguen siendo líneas sueltas dentro de ```main()```.
+
+### Solución
+
+La corrección se hizo por etapas, una función a la vez y con un commit por etapa:
+
+| Etapa | Cambio | Commit |
+|---|---|---|
+| 1 | ```city_territories``` recibe el diccionario de tildes como parámetro (```accent_dic```) y deja de leer la variable global. | ```768fe98``` |
+| 2 | El ```.str.strip()``` de "Municipio" se hace antes de calcular ```city_list```. | ```46c6f59``` |
+| 3 | La clasificación de estados pasa a ```classify_status(observations)```. | ```8401dc6``` |
+| 4a | La normalización de nombres pasa a ```normalized_names(names)```. | ```27c4e07``` |
+| 4b | La separación de contactos pasa a ```split_contacts(df)```. | ```b0e3184``` |
+| 4c | El orden de columnas pasa a ```reorder_columns(df)```. | ```36d8d14``` |
+| 4d | El diccionario de tildes pasa a ```build_accent_dic(regions)```; la lectura y la escritura del JSON pasan a ```load_progress(progress_file)``` y ```save_progress(region_map, progress_file)```, y se elimina la segunda lectura del JSON. | ```38ca1b9```, ```b120fa8``` |
+| 4e | La lectura y la escritura del CSV pasan a ```load_raw_data(raw_file)``` y ```save_output(df, output_file)```. | ```5c18cb5``` |
+| 4f | Todo el bloque pasa a ```main()```, y el bloque ```if __name__``` solo la llama. | ```4d92e22``` |
+
+El resultado es este (se omiten los dos comentarios largos de final de línea):
+
+```python
+def main():
+    '''
+    Ejecuta el pipeline completo, desde la lectura del insumo original hasta el reporte de cierre.
+
+    Orden: lee el CSV de data/raw/ → asigna regiones (cargando y guardando el progreso en data/interim/) → separa contactos → clasifica el estado → reordena columnas → normaliza nombres y fechas → guarda el CSV en data/processed/ → imprime el reporte de cierre.
+
+    Returns:
+        None: la función no devuelve nada; su resultado son los archivos escritos y el reporte impreso.
+
+    Notes:
+        - Las rutas se deciden aquí y se pasan a las funciones de lectura y escritura, para que esas funciones puedan probarse con archivos temporales.
+        - Existe como función, y no solo como bloque if __name__, para que importar el módulo (por ejemplo, desde pytest) no ejecute el pipeline. El bloque if __name__ solo la llama cuando el archivo se ejecuta con python3 main.py.
+    '''
+    project_root=Path(__file__).resolve().parent
+    actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
+    df=load_raw_data(actual_file)
+
+    df["Municipio"]=df["Municipio"].str.strip()
+    city_list=df["Municipio"].unique().tolist()
+
+    accent_normalization_dic=build_accent_dic(df["Región"])
+
+    progress_root=project_root/"data"/"interim"
+    progress_root.mkdir(parents=True,exist_ok=True)
+    progress_file=progress_root/"progress_territories.json"
+
+    data_saved=load_progress(progress_file)
+
+    rpoint=city_territories(city_list, accent_normalization_dic, progress=data_saved)
+    save_progress(rpoint, progress_file)
+
+    df["Región"]=df["Municipio"].map(rpoint)
+
+    df=split_contacts(df)
+
+    df["Estado"]=classify_status(df["Observaciones"])
+
+    df=reorder_columns(df)
+
+    df["Nombre_Informante"]=normalized_names(df["Nombre_Informante"])
+
+    df["Fecha_Registro"]=normalized_dates(df["Fecha_Registro"])
+
+    saved_file = project_root / "data" / "processed" / "datos_limpios_hito1.csv"
+
+    save_output(df, saved_file)
+    print_closing_report(df)
+
+
+#Bloque if __name__=="__main__"
+
+if __name__=="__main__":
+    main()
+```
+
+**Explicación del código:**
+
+1. ```main()``` se lee como un índice del pipeline: casi cada línea es una llamada a una función con nombre. Para saber qué hace el programa basta leer los nombres; para saber cómo lo hace, se abre la función correspondiente.
+2. ```def main():``` define el pipeline, pero no lo ejecuta. Lo ejecuta el bloque ```if __name__=="__main__":```, y solo cuando el archivo se corre con ```python3 main.py```. Cuando otro archivo hace ```import main```, ```__name__``` vale "main" y no "__main__", así que la condición es falsa y no se ejecuta nada. Esto es lo que permite que pytest importe las funciones sin disparar la captura de regiones ni escribir archivos.
+3. Dentro de una función solo se usan sus parámetros y sus variables locales. Una función que lee una variable definida en el bloque ```__main__``` funciona por accidente al correr el script, pero falla con ```NameError``` al importarla. Así fallaba antes ```city_territories```, y casi le pasó a ```save_output``` durante la etapa 4e: su primera versión usaba ```saved_file```, una variable del bloque, en vez de su parámetro ```output_file```.
+4. Las rutas se deciden en ```main()``` y las funciones solo leen o escriben (```load_raw_data```, ```load_progress```, ```save_progress```, ```save_output```). Así cada función se puede probar con un archivo temporal sin tocar ```data/```.
+5. ```save_output``` recibe la ruta del archivo y no la de la carpeta. La carpeta se obtiene con ```output_file.parent```, que es un atributo (sin paréntesis); el método que la crea es ```.mkdir(parents=True, exist_ok=True)```. ```parents=True``` crea también las carpetas intermedias que falten, y ```exist_ok=True``` evita ```FileExistsError``` en la segunda ejecución.
+6. ```save_progress``` y ```save_output``` no tienen ```return```: su único efecto es escribir un archivo. Por eso se llaman en su propia línea, sin asignarlas a una variable.
+7. Se eliminó la segunda lectura del JSON. Antes, el pipeline escribía el progreso y lo volvía a leer de inmediato en ```mapping_dict``` para usarlo en el ```.map()```. Esa lectura devolvía el mismo diccionario que ya estaba en memoria en ```rpoint```, así que el ```.map()``` ahora usa ```rpoint``` directamente. (Este punto también estaba listado en H-10.)
+8. ```split_contacts``` empieza con ```df=df.copy()```, porque ```insert()``` y ```drop(inplace=True)``` modifican el mismo objeto que se pasa como argumento. Sin la copia, la función alteraría el DataFrame de quien la llama. ```reorder_columns``` no la necesita, pues ```df[lista_de_columnas]``` ya devuelve un DataFrame nuevo.
+
+**Decisión de diseño: el ```input()``` se mantiene**
+
+La auditoría proponía, como mejora opcional, quitar el ```input()``` de ```city_territories``` para que el pipeline corriera sin intervención. El 4 de noviembre se decidió mantenerlo: el programa pide la región de un municipio solo cuando no está en ```data/interim/progress_territories.json```, y la guarda ahí, por lo que las ejecuciones siguientes no preguntan nada. El ```input()``` ya no impide las pruebas, pues en H-05 se simula con ```monkeypatch```. La decisión queda documentada en el README.
+
+**Verificación**
+
+Después de cada etapa se corrió el pipeline y se comparó la salida con ```cmp``` contra una copia de referencia guardada antes del cambio: el CSV y el JSON fueron idénticos byte a byte en todas las etapas. Un refactor correcto cambia la estructura del código, no su resultado. Además, con ```python3 -c "import main; print('OK')"``` se comprobó que importar el módulo no ejecuta el pipeline.
