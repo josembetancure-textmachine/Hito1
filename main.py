@@ -431,10 +431,19 @@ def print_closing_report(df):
         print(f"[AVISO] Fechas que fueron etiquetadas 'Sin dato': {unclassified_date}.")
 
 
-#Bloque if __name__=="__main__"
+def main():
+    '''
+    Ejecuta el pipeline completo, desde la lectura del insumo original hasta el reporte de cierre.
 
-if __name__=="__main__":
+    Orden: lee el CSV de data/raw/ → asigna regiones (cargando y guardando el progreso en data/interim/) → separa contactos → clasifica el estado → reordena columnas → normaliza nombres y fechas → guarda el CSV en data/processed/ → imprime el reporte de cierre.
 
+    Returns:
+        None: la función no devuelve nada; su resultado son los archivos escritos y el reporte impreso.
+
+    Notes:
+        - Las rutas se deciden aquí y se pasan a las funciones de lectura y escritura, para que esas funciones puedan probarse con archivos temporales.
+        - Existe como función, y no solo como bloque if __name__, para que importar el módulo (por ejemplo, desde pytest) no ejecute el pipeline. El bloque if __name__ solo la llama cuando el archivo se ejecuta con python3 main.py.
+    '''
     project_root=Path(__file__).resolve().parent
     actual_file=project_root/"data"/"raw"/"datos_sucios_hito1.csv"
     df=load_raw_data(actual_file)
@@ -469,3 +478,10 @@ if __name__=="__main__":
 
     save_output(df, saved_file)
     print_closing_report(df)
+
+
+#Bloque if __name__=="__main__"
+
+if __name__=="__main__":
+    main()
+    
