@@ -1135,4 +1135,13 @@ def test_progress_missing_file_and_round_trip(tmp_path):
 7. ```extract_contact``` devuelve una tupla en el orden (teléfono, correo). Una tupla se compara directamente con ```==```, sin ```.tolist()```.
 8. ```tmp_path``` es otra herramienta de pytest: al escribirla como parámetro, pytest entrega una carpeta vacía y nueva en cada ejecución. Así la prueba de progreso lee y escribe un JSON sin tocar el de ```data/interim/```. El orden importa: primero se comprueba que, sin archivo, ```load_progress``` devuelve ```{}```; después se guarda con ```save_progress```, en su propia línea y sin ```assert```, porque devuelve ```None```; y al final se comprueba que lo leído es igual a lo guardado.
 9. El ```from main import (...)``` importa las funciones sin ejecutar el pipeline gracias a la corrección de H-09: al importar, ```__name__``` vale "main" y el bloque ```if __name__=="__main__":``` no llama a ```main()```.
-10. ```pytest.ini``` es necesario porque, al ejecutar ```pytest -q``` a secas, pytest busca los módulos desde la carpeta ```tests/``` y no desde la raíz del proyecto; sin este archivo, la prueba falla con ```ModuleNotFoundError: No module named 'main'```. ```pythonpath = .``` agrega la raíz a la ruta de búsqueda. La alternativa era ejecutar siempre ```python3 -m pytest```, pues ```-m``` agrega la carpeta actual, pero
+10. ```pytest.ini``` es necesario porque, al ejecutar ```pytest -q``` a secas, pytest busca los módulos desde la carpeta ```tests/``` y no desde la raíz del proyecto; sin este archivo, la prueba falla con ```ModuleNotFoundError: No module named 'main'```. ```pythonpath = .``` agrega la raíz a la ruta de búsqueda. La alternativa era ejecutar siempre ```python3 -m pytest```, pues ```-m``` agrega la carpeta actual, pero se prefirió el archivo de configuración para que el comando fuera el estándar.
+11. Se comprobó que las pruebas pueden fallar: al cambiar por un momento el resultado esperado de la primera prueba de "Rojo" a "Verde", pytest mostró ```1 failed, 4 passed``` y ```assert ['Rojo'] == ['Verde']```. Una prueba que nunca falla no prueba nada.
+
+**Verificación**
+
+Con ```pytest -q```, desde la raíz y con la ```.venv``` activada, el resultado es ```5 passed```. El pipeline sigue produciendo un CSV idéntico al de la referencia. Commits: ```696fd98``` (configuración de pytest), ```f97971d``` (pruebas) y ```c1b81a9``` (README).
+
+**Pendiente**
+
+Quedan para una segunda fase la integración continua con GitHub Actions, que ejecutaría ```pytest``` automáticamente en cada push, y una prueba de extremo a extremo del pipeline completo. Esa prueba no puede quedarse esperando un ```input()```, por lo que deberá usar municipios ya mapeados en el JSON o simular la entrada con ```monkeypatch```.
