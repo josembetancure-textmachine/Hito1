@@ -1040,3 +1040,99 @@ La auditoría proponía, como mejora opcional, quitar el ```input()``` de ```cit
 **Verificación**
 
 Después de cada etapa se corrió el pipeline y se comparó la salida con ```cmp``` contra una copia de referencia guardada antes del cambio: el CSV y el JSON fueron idénticos byte a byte en todas las etapas. Un refactor correcto cambia la estructura del código, no su resultado. Además, con ```python3 -c "import main; print('OK')"``` se comprobó que importar el módulo no ejecuta el pipeline.
+
+## H-05
+
+En la versión anterior (antes de la auditoría), el proyecto no tenía pruebas automatizadas. La validación se hacía mirando la salida del pipeline y comprobando que los conteos de estados sumaran 135. Esto tenía dos problemas. El primero: una revisión visual solo detecta los errores que uno ya sospecha; por ejemplo, el caso "Urgente… sin novedad" de H-01 pasó desapercibido porque no estaba en el CSV. El segundo: cada corrección (H-01 a H-04 y H-09) podía romper algo que ya funcionaba, y la única forma de saberlo era volver a revisar todo a mano. Además, el código no se podía probar por partes, pues toda la lógica vivía en el bloque ```__main__```; esa fue la razón para resolver H-09 antes que H-05.
+
+Una prueba es una función que llama al código con una entrada conocida y comprueba con ```assert``` que la salida sea la esperada. Se usó pytest, que busca esas funciones, las ejecuta todas y muestra cuáles fallaron y por qué. Cada prueba protege la corrección de un hallazgo: si en el futuro alguien modifica el código y reaparece el error, la prueba falla.
+
+### Solución
+
+Se agregaron cuatro archivos:
+
+| Archivo | Contenido |
+|---|---|
+| ```tests/test_main.py``` | Las cinco pruebas. |
+| ```pytest.ini``` | ```[pytest]``` y ```pythonpath = .```, para que pytest encuentre ```main.py```. |
+| ```requirements.txt``` | Se agregó la línea ```pytest==9.2.0```. |
+| ```.gitignore``` | Se agregó ```.pytest_cache/```, la carpeta que pytest crea al ejecutarse. |
+
+```python
+# Pruebas unitarias del pipeline de Hito 1 (H-05).
+# Se ejecutan desde la raíz del proyecto con: pytest -q
+
+import pandas as pd
+
+from main import (
+    build_accent_dic,
+    city_territories,
+    classify_status,
+    extract_contact,
+    load_progress,
+    normalized_dates,
+    save_progress,
+)
+
+
+def test_classify_status_urgent_wins_over_normal():
+    # H-01: una observación urgente que además dice "normal" y "sin novedad" debe quedar en Rojo, no en Verde.
+    observations = pd.Series(["Urgente: revisar. Todo normal, sin novedad."])
+
+    result = classify_status(observations)
+
+    assert result.tolist() == ["Rojo"]
+
+
+def test_normalized_dates_mixed_formats():
+    # H-02: fechas en formatos distintos quedan en dd/mm/aaaa; una fecha imposible y un nulo quedan como "Sin dato".
+    dates = pd.Series(["8/2/26", "Abr 05, 2026", "2026-02-11", "31/02/26", None])
+
+    result = normalized_dates(dates)
+
+    assert result.tolist() == ["08/02/2026", "05/04/2026", "11/02/2026", "Sin dato", "Sin dato"]
+
+
+def test_city_territories_fixes_accent_from_input(monkeypatch):
+    # H-04 y H-09: el input() se simula con monkeypatch para que la prueba no espere el teclado.
+    # El operador escribe "uraba" sin tilde y la región debe guardarse como "Urabá".
+    monkeypatch.setattr("builtins.input", lambda prompt: "uraba")
+    accent_dic = build_accent_dic(pd.Series(["Urabá", "Norte"]))
+
+    result = city_territories(["Turbo"], accent_dic)
+
+    assert result == {"Turbo": "Urabá"}
+
+
+def test_extract_contact_email_with_hyphen():
+    # H-03: un correo con guion no se parte; el teléfono y el correo quedan cada uno en su lugar.
+    result = extract_contact("3001234567 puerto-claver@dominio.com")
+
+    assert result == ("3001234567", "puerto-claver@dominio.com")
+
+
+def test_progress_missing_file_and_round_trip(tmp_path):
+    # H-09: sin archivo de progreso se devuelve un diccionario vacío;
+    # lo que se guarda con save_progress se recupera igual con load_progress.
+    progress_file = tmp_path / "progress_territories.json"
+    region_map = {"Medellín": "Valle de Aburrá"}
+
+    assert load_progress(progress_file) == {}
+
+    save_progress(region_map, progress_file)
+
+    assert load_progress(progress_file) == region_map
+```
+
+**Explicación del código:**
+
+1. pytest solo reconoce como pruebas los archivos que se llaman ```test_*.py``` y las funciones que empiezan por ```test_```. Si un nombre no cumple esa regla, pytest no ejecuta esa prueba y no avisa. Una prueba no recibe argumentos propios ni devuelve nada: pasa si ningún ```assert``` falla.
+2. Cada prueba sigue el mismo orden de tres pasos: se prepara la entrada, se llama a la función y se comprueba el resultado con ```assert```. El nombre de cada prueba dice qué función se prueba y qué se comprueba, y el comentario dice qué hallazgo protege.
+3. ```classify_status``` y ```normalized_dates``` devuelven una Series. Por eso el resultado se convierte con ```.tolist()``` antes de compararlo: comparar una Series con una lista mediante ```==``` en un ```assert``` produce ```ValueError: The truth value of a Series is ambiguous```.
+4. La prueba de fechas incluye cinco casos en una sola entrada: año corto (```8/2/26```), mes en español (```Abr 05, 2026```), año al inicio (```2026-02-11``` → ```11/02/2026```), una fecha imposible (```31/02/26```) y un nulo. Los dos últimos comprueban que ```errors="coerce"``` los convierte en "Sin dato" en lugar de detener el programa.
+5. ```city_territories``` llama a ```input()```, que esperaría una respuesta del teclado. ```monkeypatch``` es una herramienta de pytest que, solo durante esa prueba, reemplaza ```input``` por una función falsa: ```lambda prompt: "uraba"``` recibe el texto de la pregunta, lo ignora y siempre «responde» "uraba". Al terminar la prueba, ```input``` vuelve a ser el original. Sin ```monkeypatch```, la prueba falla con ```OSError: pytest: reading from stdin while output is captured!```.
+6. La misma prueba usa ```build_accent_dic``` para construir el diccionario de tildes. Así cubre dos funciones a la vez: si cualquiera de las dos deja de corregir la tilde, el resultado ya no es "Urabá".
+7. ```extract_contact``` devuelve una tupla en el orden (teléfono, correo). Una tupla se compara directamente con ```==```, sin ```.tolist()```.
+8. ```tmp_path``` es otra herramienta de pytest: al escribirla como parámetro, pytest entrega una carpeta vacía y nueva en cada ejecución. Así la prueba de progreso lee y escribe un JSON sin tocar el de ```data/interim/```. El orden importa: primero se comprueba que, sin archivo, ```load_progress``` devuelve ```{}```; después se guarda con ```save_progress```, en su propia línea y sin ```assert```, porque devuelve ```None```; y al final se comprueba que lo leído es igual a lo guardado.
+9. El ```from main import (...)``` importa las funciones sin ejecutar el pipeline gracias a la corrección de H-09: al importar, ```__name__``` vale "main" y el bloque ```if __name__=="__main__":``` no llama a ```main()```.
+10. ```pytest.ini``` es necesario porque, al ejecutar ```pytest -q``` a secas, pytest busca los módulos desde la carpeta ```tests/``` y no desde la raíz del proyecto; sin este archivo, la prueba falla con ```ModuleNotFoundError: No module named 'main'```. ```pythonpath = .``` agrega la raíz a la ruta de búsqueda. La alternativa era ejecutar siempre ```python3 -m pytest```, pues ```-m``` agrega la carpeta actual, pero
