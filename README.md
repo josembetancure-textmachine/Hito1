@@ -8,7 +8,7 @@ Pipeline de análisis de datos para la limpieza y normalización (acentos, mayú
 
 Las observaciones de este dataset describen situaciones de campo que pueden implicar afectaciones a la vida, la salud o los derechos de población vulnerable. Por eso el pipeline no se limita a limpiar y normalizar los datos: también asigna un nivel de prioridad (rojo, naranja, amarillo, verde) según el contenido de cada observación, de manera que los casos más urgentes puedan identificarse de inmediato en vez de perderse entre 135 filas sin clasificar.
 
-**Nota sobre los datos:** este dataset es sintético, es decor, fue diseñado para imitar un reporte de campo (acentos inconsistentes, fechas ambiguas, datos faltantes, redacción variable). No proviene de observaciones reales de docentes.
+**Nota sobre los datos:** este dataset es sintético, es decir, fue diseñado para imitar un reporte de campo (acentos inconsistentes, fechas ambiguas, datos faltantes, redacción variable). No proviene de observaciones reales de docentes.
 
 ## Contexto
 
@@ -43,9 +43,28 @@ Es indispensable que el archivo datos_sucios_hito1.csv se encuentre ubicado en l
 
 Este pipeline genera un archivo llamado datos_limpios_hito1.csv en Hito1/data/processed/. A diferencia del insumo original, este nuevo archivo contiene los datos de contacto separados en dos nuevas columnas (teléfono y correo), las regiones reasignadas para cada municipio según el input del usuario, los acentos de esas regiones normalizados, mayúsculas normalizadas, fechas en formato día/mes/año para todos los casos y una nueva columna (estado) donde se asigna un nivel de prioridad según la columna de observaciones.
 
-En relación con lo anterior, se debe tener en cuenta que, en caso de que se incluya una nueva fila con un municipio que no hace parte del conjunto original o de que se elimine el JSON de Hito1/interim, el pipeline pedirá que el usuario ingrese manualmente las regiones correspondientes para poder continuar su ejecución.
+En relación con lo anterior, se debe tener en cuenta que, en caso de que se incluya una nueva fila con un municipio que no hace parte del conjunto original o de que se elimine el JSON de Hito1/data/interim, el pipeline pedirá que el usuario ingrese manualmente las regiones correspondientes para poder continuar su ejecución.
 
 Debe considerarse que la ruta processed/ se encuentra incluida en .gitignore, por lo que el archivo generado por el pipeline no se encuentra _trackeado_ por el repositorio, sino que se crea al ejecutar el código.
+
+## Decisión de diseño: entrada interactiva
+
+El pipeline asigna la región de cada municipio a partir de lo que ingresa el operador con `input()`. Esta interacción se mantiene como decisión de diseño:
+
+- El programa solo pregunta por los municipios que no están en `data/interim/progress_territories.json`. Cada región ingresada se guarda en ese archivo, por lo que las ejecuciones siguientes no vuelven a preguntar.
+- La región solo admite letras y espacios. Si se escribe sin tilde una región que en el CSV aparece con tilde (por ejemplo, "uraba"), se guarda con la tilde ("Urabá").
+- Para salir antes de terminar, se escribe `-`. Esto detiene toda la captura: lo asignado hasta ese momento se guarda, los municipios restantes quedan sin región en el CSV de salida y el informe de cierre los lista junto con el número de filas afectadas. En la siguiente ejecución, el programa pregunta solo por esos municipios.
+- En las pruebas automatizadas, el `input()` se simula con `monkeypatch` de pytest, de modo que las pruebas no esperan respuesta del teclado.
+
+## Pruebas
+
+Con el entorno virtual activado, desde la raíz del proyecto:
+
+```bash
+pytest -q
+```
+
+Las pruebas están en `tests/test_main.py` y cubren la clasificación de estados, la normalización de fechas, la separación de contactos, la captura de regiones (con el `input()` simulado) y el archivo de progreso. pytest se instala con el resto de dependencias (`pip install -r requirements.txt`). El archivo `pytest.ini` agrega la raíz del proyecto a la ruta de búsqueda de módulos; sin él, pytest no encuentra `main.py`.
 
 ## Estructura del proyecto
 
@@ -57,7 +76,9 @@ Hito1/
 │   └── processed/     [Contiene el resultado del pipeline. Está en .gitignore porque no se necesita para ejecutar el pipeline.]
 ├── notebooks/          [Contiene los notebooks .ipynb en los que se exploró el código antes del pipeline final.]
 ├── main.py             [Es el pipeline consolidado y ejecutable]
-├── NOTAS.md            [Archivo de estudio en el que se consignó el proceso de pensamiento al construir el código. Sirve para los reclutadores.]
+├── tests/              [Contiene las pruebas automatizadas del pipeline (pytest).]
+├── pytest.ini          [Configuración de pytest: agrega la raíz del proyecto a la ruta de búsqueda de módulos.]
+├── NOTAS_HITO1.md      [Archivo de estudio en el que se consignó el proceso de pensamiento al construir el código. Sirve para los reclutadores.]
 ├── requirements.txt
 └── .gitignore
 ```
